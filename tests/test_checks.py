@@ -150,3 +150,10 @@ def test_check_format_cli_survives_a_broken_event(tmp_path):
     p = subprocess.run([sys.executable, str(ROOT / "scripts" / "tm.py"), "check-format", "--event", str(ev),
                         "--event-name", "pull_request"], capture_output=True, text=True)
     assert p.returncode == 0 and "could not run" in p.stdout
+
+
+def test_closing_keyword_in_a_commit_warns_in_ci(repo):
+    before = sha(repo)
+    git(repo, "commit", "-q", "--allow-empty", "--no-verify", "-m", "fix(a): b (#3)", "-m", "Closes #3")
+    problems = checks.push_problems({"before": before, "after": sha(repo)}, cwd=repo)
+    assert len(problems) == 1 and "closes #3" in problems[0]

@@ -24,6 +24,11 @@ def commit_problems(rng: str, cwd: str | None = None) -> list[str]:
             continue
         for p in fmt.check_subject(c["subject"]):
             problems.append(f"commit {c['sha'][:7]}: {p}")
+        if not fmt.subject_exempt(c["subject"]):
+            refs = fmt.closing_refs(c["subject"] + "\n" + c.get("body", ""))
+            if refs:
+                problems.append(f"commit {c['sha'][:7]} closes {', '.join(refs)}: commits do not use "
+                                "Fixes/Closes (git.md 5), the PR body does")
     return problems
 
 
