@@ -1,0 +1,25 @@
+# git.md section 11
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+.mcp.json
+CONNECT-*.md
+.venv/
+venv/
+node_modules/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.cache/
+dist/
+build/
+*.bak
+*.orig
+*~
+.DS_Store
+.shots/
+.omicron/
+.claude/
+.notes/

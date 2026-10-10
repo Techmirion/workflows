@@ -1,0 +1,9 @@
+[project]
+name = "techmirion-workflows"
+version = "0.0.0"
+description = "Shared GitHub automation of the Techmirion org: reusable workflows, git hooks, labels, repo-init."
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
