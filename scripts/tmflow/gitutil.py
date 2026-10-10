@@ -63,16 +63,17 @@ def current_branch(cwd: str | None = None) -> str | None:
 
 def commits(rng: str, cwd: str | None = None) -> list[dict]:
     """Commits in a range (`a..b`, or a single sha), newest first, with parents and author."""
-    fmt = "%H%x1f%P%x1f%an%x1f%ae%x1f%s%x1e"
+    fmt = "%H%x1f%P%x1f%an%x1f%ae%x1f%s%x1f%b%x1e"
     out = git("log", f"--format={fmt}", rng, cwd=cwd) if ".." in rng else git("log", "-1", f"--format={fmt}", rng, cwd=cwd)
     result = []
     for rec in out.split("\x1e"):
         rec = rec.strip("\n")
         if not rec:
             continue
-        sha, parents, an, ae, subject = rec.split("\x1f")
+        sha, parents, an, ae, subject, body = rec.split("\x1f")
         result.append({
             "sha": sha, "parents": parents.split(), "author": an, "email": ae, "subject": subject,
+            "body": body.strip(),
         })
     return result
 
