@@ -1,0 +1,18 @@
+# This repo's own branch cleanup (see cleanup.yml).
+name: self-cleanup
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  cleanup:
+    if: github.event.pull_request.merged == true
+    uses: ./.github/workflows/cleanup.yml
+    with:
+      workflows-repo: ${{ github.repository }}
+      workflows-ref: ${{ github.event.pull_request.base.sha }}

@@ -1,0 +1,82 @@
+# Reusable workflow: after a push to main (git.md 9 and 12).
+# Finds the merged PR. A release PR (head dev) gives the version from its
+# `Version:` line; a hotfix PR (head hotfix/*) gets the next patch version.
+# Then: an annotated tag on the merge commit, the GitHub Release, and dev
+# fast-forwarded to main, or a `chore(release): sync main into dev` PR if dev
+# has moved on. A push to main without a PR is only flagged.
+# Writes use a short-lived token of the automation App (git.md 14).
+name: release
+
+on:
+  workflow_call:
+    inputs:
+      move-major-tag:
+        description: Also move the major tag (v1) to the release. Only the workflows repo does this.
+        type: boolean
+        default: false
+      workflows-repo:
+        description: The repo holding the shared scripts.
+        type: string
+        default: Techmirion/workflows
+      workflows-ref:
+        description: Ref of the shared scripts. Keep it equal to the ref in the caller's `uses:` line.
+        type: string
+        default: v1
+      runs-on:
+        description: Runner label.
+        type: string
+        default: ubuntu-24.04
+    secrets:
+      AUTOMATION_APP_ID:
+        description: Id (or client id) of the Techmirion automation App.
+        required: true
+      AUTOMATION_APP_KEY:
+        description: Private key of the Techmirion automation App.
+        required: true
+
+permissions: {}
+
+jobs:
+  release:
+    name: release
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Token of the automation App (this repo only)
+        id: app
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ secrets.AUTOMATION_APP_ID }}
+          private-key: ${{ secrets.AUTOMATION_APP_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-workflows: write
+
+      - name: Check out the repo with all branches and tags
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: repo
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check out the shared automation
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ inputs.workflows-repo }}
+          ref: ${{ inputs.workflows-ref }}
+          path: wf
+          persist-credentials: false
+
+      - name: Tag, release, sync dev
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          APP_SLUG: ${{ steps.app.outputs.app-slug }}
+          REPO: ${{ github.repository }}
+          MOVE_MAJOR: ${{ inputs.move-major-tag }}
+        run: |
+          args=()
+          if [ "$MOVE_MAJOR" = "true" ]; then args+=(--move-major-tag); fi
+          python3 wf/scripts/tm.py release --repo "$REPO" --sha "$GITHUB_SHA" --git-dir repo \
+            --app-slug "$APP_SLUG" "${args[@]}"

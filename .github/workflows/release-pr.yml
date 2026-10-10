@@ -1,0 +1,83 @@
+# Reusable workflow: open the release PR dev -> main (git.md 9).
+# Refuses unless main is an ancestor of dev and the version is above the last
+# release tag. The PR body starts with `Version: vX.Y.Z`, then the PRs merged
+# since the last release and one `Fixes #N` per issue they complete.
+# The PR is opened with a short-lived token of the automation App, so that the
+# checks and the other workflows run on it (the job's own token would not
+# trigger them).
+name: release-pr
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: The version to release, vMAJOR.MINOR.PATCH.
+        type: string
+        required: true
+      summary:
+        description: A few words for the PR title, after the version.
+        type: string
+        default: ""
+      workflows-repo:
+        description: The repo holding the shared scripts.
+        type: string
+        default: Techmirion/workflows
+      workflows-ref:
+        description: Ref of the shared scripts. Keep it equal to the ref in the caller's `uses:` line.
+        type: string
+        default: v1
+      runs-on:
+        description: Runner label.
+        type: string
+        default: ubuntu-24.04
+    secrets:
+      AUTOMATION_APP_ID:
+        description: Id (or client id) of the Techmirion automation App.
+        required: true
+      AUTOMATION_APP_KEY:
+        description: Private key of the Techmirion automation App.
+        required: true
+
+permissions: {}
+
+jobs:
+  release-pr:
+    name: release-pr
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Token of the automation App (this repo only)
+        id: app
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ secrets.AUTOMATION_APP_ID }}
+          private-key: ${{ secrets.AUTOMATION_APP_KEY }}
+          permission-contents: read
+          permission-pull-requests: write
+
+      - name: Check out the repo with all branches and tags
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: repo
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check out the shared automation
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ inputs.workflows-repo }}
+          ref: ${{ inputs.workflows-ref }}
+          path: wf
+          persist-credentials: false
+
+      - name: Open the release PR
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          REPO: ${{ github.repository }}
+          VERSION: ${{ inputs.version }}
+          SUMMARY: ${{ inputs.summary }}
+        run: >-
+          python3 wf/scripts/tm.py release-pr --repo "$REPO" --version "$VERSION"
+          --summary "$SUMMARY" --git-dir repo

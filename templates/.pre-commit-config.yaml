@@ -1,0 +1,16 @@
+# The Techmirion hooks (git.md 5 and 14): gitleaks on staged changes, `(#N)` from
+# the branch name, and the commit message format.
+#   pip install pre-commit && pre-commit install
+# (default_install_hook_types installs all three). Needs the gitleaks binary:
+#   sh <workflows clone>/scripts/install-gitleaks.sh
+# `rev` is a full version: pre-commit never updates a moving tag such as v1.
+# Without network or pre-commit: sh <workflows clone>/scripts/install-hooks.sh .
+minimum_pre_commit_version: "3.2.0"
+default_install_hook_types: [pre-commit, prepare-commit-msg, commit-msg]
+repos:
+  - repo: https://github.com/Techmirion/workflows
+    rev: v1.0.0
+    hooks:
+      - id: gitleaks
+      - id: issue-ref
+      - id: commit-format

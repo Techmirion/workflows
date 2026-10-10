@@ -1,0 +1,18 @@
+# Dependabot version updates (git.md 10): weekly, into dev, grouped, labelled
+# `deps`, commits prefixed `chore(deps)`. Keep only the ecosystems the repo has:
+# for another one (pip, npm, ...) copy the block and change package-ecosystem
+# and the group name. Dependabot's security-update PRs stay off in the repo
+# settings, because they would target main.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns: ["*"]
+    labels: ["deps"]
+    commit-message:
+      prefix: "chore(deps)"

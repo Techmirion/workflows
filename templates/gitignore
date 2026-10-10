@@ -1,0 +1,48 @@
+# --- git.md section 11: what never enters a repo ---------------------------
+# Secrets and connection files
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+.mcp.json
+CONNECT-*.md
+.netrc
+.npmrc
+.pypirc
+# Data of class 2 or 3, lab, client or employer material
+*.db
+*.sqlite
+*.sqlite3
+*.dump
+*.sql.gz
+uploads/
+corpus/
+# Platform and edge configuration
+.cloudflared/
+Caddyfile.local
+# Generated and local files
+.venv/
+venv/
+node_modules/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.cache/
+dist/
+build/
+*.bak
+*.orig
+*~
+.DS_Store
+.shots/
+screenshots/
+# AI scratch and session notes
+.omicron/
+.claude/
+.notes/
+SESSION-NOTES*.md

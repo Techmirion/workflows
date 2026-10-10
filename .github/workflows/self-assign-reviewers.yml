@@ -1,0 +1,18 @@
+# This repo's own reviewer requests (see assign-reviewers.yml).
+name: self-assign-reviewers
+
+on:
+  pull_request_target:
+    branches: [dev, main]
+    types: [opened, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  assign-reviewers:
+    uses: ./.github/workflows/assign-reviewers.yml
+    with:
+      workflows-repo: ${{ github.repository }}
+      workflows-ref: ${{ github.sha }}

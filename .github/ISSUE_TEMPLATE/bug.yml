@@ -1,0 +1,58 @@
+name: Bug
+description: Something is broken.
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A security problem, a leaked secret or exposed data is **not** a GitHub issue:
+        open a confidential task in the hub and tell an admin. Do not paste secrets,
+        personal data or client material here, and no screenshots that show them.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, and what you saw.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1.
+        2.
+        3.
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where
+      options:
+        - production
+        - staging
+        - a preview
+        - my own machine
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: The version tag of production, or the commit of staging or the preview, if you know it.
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity (your estimate; triage sets the severity label)
+      options:
+        - "S1: production down, data lost or exposed"
+        - "S2: a main feature is broken, with no workaround"
+        - "S3: a feature is broken, with a workaround"
+        - "S4: cosmetic, or an annoyance"
+    validations:
+      required: true

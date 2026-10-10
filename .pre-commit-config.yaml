@@ -1,0 +1,26 @@
+# This repo's own hooks: the same three hooks, run from this checkout.
+# Plain-git alternative without pre-commit: sh scripts/install-hooks.sh
+minimum_pre_commit_version: "3.2.0"
+default_install_hook_types: [pre-commit, prepare-commit-msg, commit-msg]
+repos:
+  - repo: local
+    hooks:
+      - id: gitleaks
+        name: gitleaks (staged changes)
+        entry: hooks/pre-commit
+        language: script
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+      - id: issue-ref
+        name: add (#N) from the branch name
+        entry: hooks/prepare-commit-msg
+        language: script
+        always_run: true
+        stages: [prepare-commit-msg]
+      - id: commit-format
+        name: commit message format
+        entry: hooks/commit-msg
+        language: script
+        always_run: true
+        stages: [commit-msg]

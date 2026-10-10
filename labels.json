@@ -1,0 +1,19 @@
+[
+  {"name": "bug", "color": "d73a4a", "description": "Something is broken"},
+  {"name": "feature", "color": "a2eeef", "description": "A new feature or an improvement"},
+  {"name": "chore", "color": "cfd3d7", "description": "Maintenance with no visible change"},
+  {"name": "docs", "color": "0075ca", "description": "Documentation"},
+  {"name": "deps", "color": "0366d6", "description": "A dependency update"},
+  {"name": "priority:urgent", "color": "b60205", "description": "Production broken, data exposed, or a deadline within days. Hotfix flow"},
+  {"name": "priority:high", "color": "d93f0b", "description": "The next thing to pick up"},
+  {"name": "priority:normal", "color": "fbca04", "description": "The default"},
+  {"name": "priority:low", "color": "c2e0c6", "description": "When there is room"},
+  {"name": "severity:S1", "color": "b60205", "description": "Production down, data lost or exposed"},
+  {"name": "severity:S2", "color": "d93f0b", "description": "A main feature is broken, with no workaround"},
+  {"name": "severity:S3", "color": "fbca04", "description": "A feature is broken, with a workaround"},
+  {"name": "severity:S4", "color": "c5def5", "description": "Cosmetic, or an annoyance"},
+  {"name": "needs-triage", "color": "ededed", "description": "New: the owner triages it within two working days"},
+  {"name": "blocked", "color": "000000", "description": "Blocked: a comment says by what"},
+  {"name": "external", "color": "5319e7", "description": "Filed by someone outside the team"},
+  {"name": "wip", "color": "fef2c0", "description": "Work in progress: early feedback, not ready for review"}
+]

@@ -1,0 +1,35 @@
+# Caller of the shared `release-pr` workflow (Techmirion/workflows, git.md 9).
+# Run it from the Actions tab (or the hub's "Prepare release") with the version.
+# GitHub shows the "Run workflow" button only once this file is on main.
+name: release-pr
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to release, vMAJOR.MINOR.PATCH, above the last tag
+        required: true
+        type: string
+      summary:
+        description: A few words for the PR title
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release-pr:
+    uses: Techmirion/workflows/.github/workflows/release-pr.yml@v1
+    with:
+      version: ${{ inputs.version }}
+      summary: ${{ inputs.summary }}
+      workflows-ref: v1
+    secrets:
+      AUTOMATION_APP_ID: ${{ secrets.AUTOMATION_APP_ID }}
+      AUTOMATION_APP_KEY: ${{ secrets.AUTOMATION_APP_KEY }}

@@ -1,0 +1,34 @@
+# Hooks this repo offers to pre-commit (git.md 14). A repo uses them with:
+#
+#   repos:
+#     - repo: https://github.com/Techmirion/workflows
+#       rev: v1.0.0          # a full version: pre-commit never updates a moving tag
+#       hooks:
+#         - id: gitleaks
+#         - id: issue-ref
+#         - id: commit-format
+#
+# and installs them per clone with
+#   pre-commit install --hook-type pre-commit --hook-type prepare-commit-msg --hook-type commit-msg
+- id: gitleaks
+  name: gitleaks (staged changes)
+  description: Refuse a commit whose staged changes contain a secret. Needs the gitleaks binary.
+  entry: hooks/pre-commit
+  language: script
+  pass_filenames: false
+  always_run: true
+  stages: [pre-commit]
+- id: issue-ref
+  name: add (#N) from the branch name
+  description: On a type/N-topic branch, append (#N) to the commit subject.
+  entry: hooks/prepare-commit-msg
+  language: script
+  always_run: true
+  stages: [prepare-commit-msg]
+- id: commit-format
+  name: commit message format
+  description: "Refuse a subject that is not `type(place): message (#N)`, and Fixes/Closes in commits."
+  entry: hooks/commit-msg
+  language: script
+  always_run: true
+  stages: [commit-msg]

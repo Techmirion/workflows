@@ -1,0 +1,26 @@
+# This repo's own checks, through its own reusable workflow at the same commit.
+name: self-checks
+
+on:
+  pull_request:
+    branches: [dev, main]
+    types: [opened, synchronize, reopened, edited]
+  push:
+    branches: [dev, main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  checks:
+    uses: ./.github/workflows/checks.yml
+    with:
+      setup-command: python3 -m pip install --user -r requirements-dev.txt
+      test-command: python3 -m pytest -q
+      lint-command: sh scripts/lint.sh
+      workflows-repo: ${{ github.repository }}
+      workflows-ref: ${{ github.event.pull_request.head.sha || github.sha }}

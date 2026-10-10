@@ -1,0 +1,56 @@
+# Reusable workflow: delete the head branch of a merged PR (git.md 8).
+# Never deletes dev or main (nor the default branch, nor anything in
+# `protected-branches`), never a fork's branch, never a branch that got new
+# commits after the merge or that heads another open PR.
+# GitHub's own automatic head-branch deletion stays off: it would delete dev
+# when a release PR (dev -> main) is merged.
+name: cleanup
+
+on:
+  workflow_call:
+    inputs:
+      protected-branches:
+        description: Extra branch names never deleted, space-separated. dev and main always are.
+        type: string
+        default: dev main
+      workflows-repo:
+        description: The repo holding the shared scripts.
+        type: string
+        default: Techmirion/workflows
+      workflows-ref:
+        description: Ref of the shared scripts. Keep it equal to the ref in the caller's `uses:` line.
+        type: string
+        default: v1
+      runs-on:
+        description: Runner label.
+        type: string
+        default: ubuntu-24.04
+
+permissions: {}
+
+jobs:
+  cleanup:
+    name: cleanup
+    if: github.event.pull_request.merged == true
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      pull-requests: read
+    steps:
+      - name: Check out the shared automation
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ inputs.workflows-repo }}
+          ref: ${{ inputs.workflows-ref }}
+          path: wf
+          persist-credentials: false
+
+      - name: Delete the merged branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PROTECTED: ${{ inputs.protected-branches }}
+        run: >-
+          python3 wf/scripts/tm.py cleanup --repo "$REPO" --event "$GITHUB_EVENT_PATH"
+          --protected "$PROTECTED"

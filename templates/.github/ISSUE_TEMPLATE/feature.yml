@@ -1,0 +1,34 @@
+name: Feature
+description: Something new, or a change to how something works.
+labels: ["feature", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Keep it small enough to be done in days. Anything confidential belongs in a
+        hub task, not here.
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: The problem it solves, and for whom.
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What
+      description: What should change. Sketches welcome, without real data.
+    validations:
+      required: true
+  - type: textarea
+    id: done-when
+    attributes:
+      label: Done when
+      description: One or two sentences that say what finished looks like.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered

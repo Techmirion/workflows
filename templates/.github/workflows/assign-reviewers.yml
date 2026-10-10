@@ -1,0 +1,20 @@
+# Caller of the shared `assign-reviewers` workflow (Techmirion/workflows, git.md 7).
+# pull_request_target, so PRs from Dependabot and forks can get a reviewer too.
+# Safe: the shared workflow never checks out or runs the PR's code.
+# It only runs once this file is on the default branch (main).
+name: assign-reviewers
+
+on:
+  pull_request_target:
+    branches: [dev, main]
+    types: [opened, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  assign-reviewers:
+    uses: Techmirion/workflows/.github/workflows/assign-reviewers.yml@v1
+    with:
+      workflows-ref: v1

@@ -1,0 +1,26 @@
+# Dependabot version updates (git.md 10): weekly, into dev, grouped, labelled
+# `deps`, commits prefixed `chore(deps)`. Security-update PRs stay off.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns: ["*"]
+    labels: ["deps"]
+    commit-message:
+      prefix: "chore(deps)"
+  - package-ecosystem: pip
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: weekly
+    groups:
+      pip:
+        patterns: ["*"]
+    labels: ["deps"]
+    commit-message:
+      prefix: "chore(deps)"

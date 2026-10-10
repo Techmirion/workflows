@@ -1,0 +1,54 @@
+# Reusable workflow: request the repo owner from CODEOWNERS as reviewer, or the
+# deputy when the owner opened the PR (git.md 2 and 7). GitHub does not do this
+# by itself on private repos of the free plan.
+#
+# Callers trigger it on `pull_request_target` (opened, reopened), so that PRs from
+# Dependabot and forks get a token that can request reviewers. It is safe there:
+# it never checks out or runs the PR's code, and reads CODEOWNERS from the base branch.
+name: assign-reviewers
+
+on:
+  workflow_call:
+    inputs:
+      workflows-repo:
+        description: The repo holding the shared scripts.
+        type: string
+        default: Techmirion/workflows
+      workflows-ref:
+        description: Ref of the shared scripts. Keep it equal to the ref in the caller's `uses:` line.
+        type: string
+        default: v1
+      runs-on:
+        description: Runner label.
+        type: string
+        default: ubuntu-24.04
+
+permissions: {}
+
+jobs:
+  assign-reviewers:
+    name: assign-reviewers
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Check out the shared automation
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ inputs.workflows-repo }}
+          ref: ${{ inputs.workflows-ref }}
+          path: wf
+          persist-credentials: false
+
+      - name: Request the reviewer
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          BASE: ${{ github.event.pull_request.base.ref }}
+        run: >-
+          python3 wf/scripts/tm.py assign-reviewers --repo "$REPO" --pr "$PR"
+          --author "$AUTHOR" --base "$BASE"

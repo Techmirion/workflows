@@ -1,0 +1,28 @@
+# Caller of the shared `checks` workflow (Techmirion/workflows, git.md 14).
+# Set this repo's own commands below. Keep `workflows-ref` equal to the ref after `@`.
+name: checks
+
+on:
+  pull_request:
+    branches: [dev, main]
+    types: [opened, synchronize, reopened, edited]
+  push:
+    branches: [dev, main]
+
+permissions:
+  contents: read
+
+concurrency:
+  # One run per PR (a new push cancels the old run); every push to dev or main
+  # keeps its own run, because production relies on the run of its exact commit.
+  group: checks-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  checks:
+    uses: Techmirion/workflows/.github/workflows/checks.yml@v1
+    with:
+      setup-command: ""
+      test-command: "python3 -m pytest -q"
+      lint-command: ""
+      workflows-ref: v1

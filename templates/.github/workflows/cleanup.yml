@@ -1,0 +1,18 @@
+# Caller of the shared `cleanup` workflow (Techmirion/workflows, git.md 8).
+# Deletes the head branch of a merged PR; never dev or main.
+name: cleanup
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  cleanup:
+    if: github.event.pull_request.merged == true
+    uses: Techmirion/workflows/.github/workflows/cleanup.yml@v1
+    with:
+      workflows-ref: v1

@@ -1,0 +1,57 @@
+#!/usr/bin/env python3
+# techmirion-hook: prepare-commit-msg (Techmirion/workflows, git.md 5)
+"""Append `(#N)` to the commit subject when the branch is `type/N-topic`.
+
+Skipped for merges, squashes, cherry-picks, reverts, rebases and detached HEAD.
+Idempotent: a subject that already references #N is left alone. When the
+subject is still empty (the editor is about to open), the commit-msg hook adds
+the reference after you have written it.
+"""
+import os
+import subprocess
+import sys
+
+HERE = os.path.dirname(os.path.realpath(__file__))
+sys.path[:0] = [HERE, os.path.join(HERE, "..", "scripts")]
+
+from tmflow import fmt  # noqa: E402
+
+
+def git(*args):
+    p = subprocess.run(["git", *args], capture_output=True, text=True)
+    return p.stdout.strip() if p.returncode == 0 else None
+
+
+def comment_char():
+    c = git("config", "core.commentChar")
+    return c if c and c != "auto" else "#"
+
+
+def busy():
+    gd = git("rev-parse", "--git-dir") or ".git"
+    names = ("MERGE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD", "SQUASH_MSG", "rebase-merge", "rebase-apply")
+    return any(os.path.exists(os.path.join(gd, n)) for n in names)
+
+
+def main(argv):
+    if len(argv) < 2:
+        return 0
+    path = argv[1]
+    source = argv[2] if len(argv) > 2 else os.environ.get("PRE_COMMIT_COMMIT_MSG_SOURCE", "")
+    if source in ("merge", "squash") or busy():
+        return 0
+    branch = git("symbolic-ref", "--quiet", "--short", "HEAD")
+    issue = fmt.issue_from_branch(branch or "")
+    if issue is None:
+        return 0
+    with open(path, encoding="utf-8") as f:
+        text = f.read()
+    new = fmt.add_ref_to_message(text, issue, comment_char())
+    if new != text:
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(new)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

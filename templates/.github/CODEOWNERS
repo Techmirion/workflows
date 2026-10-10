@@ -1,0 +1,5 @@
+# Owner and deputy of this repo (git.md 2 and 7).
+# On the `*` line: the FIRST handle is the owner, the SECOND is the deputy.
+# The `assign-reviewers` workflow requests the owner on every PR, and the deputy
+# when the owner opened it.
+* @OWNER @DEPUTY

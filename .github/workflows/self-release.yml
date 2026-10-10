@@ -1,0 +1,25 @@
+# This repo's own release (see release.yml). The one repo that also moves its
+# major tag (v1), the exception of git.md 12 and 14.
+name: self-release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    uses: ./.github/workflows/release.yml
+    with:
+      move-major-tag: true
+      workflows-repo: ${{ github.repository }}
+      workflows-ref: ${{ github.sha }}
+    secrets:
+      AUTOMATION_APP_ID: ${{ secrets.AUTOMATION_APP_ID }}
+      AUTOMATION_APP_KEY: ${{ secrets.AUTOMATION_APP_KEY }}

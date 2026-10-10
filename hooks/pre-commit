@@ -1,0 +1,16 @@
+#!/bin/sh
+# techmirion-hook: pre-commit (Techmirion/workflows, git.md 11)
+# gitleaks on the staged changes. Fails closed: no gitleaks, no commit.
+set -u
+
+gl="$(command -v gitleaks 2>/dev/null || true)"
+if [ -z "$gl" ] && [ -x "$HOME/.local/bin/gitleaks" ]; then
+  gl="$HOME/.local/bin/gitleaks"
+fi
+if [ -z "$gl" ]; then
+  echo "commit refused: gitleaks is not installed." >&2
+  echo "  install it: sh <workflows clone>/scripts/install-gitleaks.sh   (puts it in ~/.local/bin)" >&2
+  exit 1
+fi
+
+exec "$gl" git --pre-commit --staged --redact --no-banner --verbose --log-level warn .
