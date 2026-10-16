@@ -150,3 +150,63 @@ def test_check_format_cli_survives_a_broken_event(tmp_path):
     p = subprocess.run([sys.executable, str(ROOT / "scripts" / "tm.py"), "check-format", "--event", str(ev),
                         "--event-name", "pull_request"], capture_output=True, text=True)
     assert p.returncode == 0 and "could not run" in p.stdout
+
+
+def test_closing_keyword_in_a_commit_warns_in_ci(repo):
+    before = sha(repo)
+    git(repo, "commit", "-q", "--allow-empty", "--no-verify", "-m", "fix(a): b (#3)", "-m", "Closes #3")
+    problems = checks.push_problems({"before": before, "after": sha(repo)}, cwd=repo)
+    assert len(problems) == 1 and "closes #3" in problems[0]
+
+
+def test_trailer_problems_count_every_commit(repo):
+    git(repo, "checkout", "-q", "-b", "dev")
+    before = sha(repo)
+    git(repo, "checkout", "-q", "-b", "chore/x")
+    git(repo, "commit", "-q", "--allow-empty", "--no-verify", "-m", "chore(x): one", "-m", "Co-Authored-By: A <a@x>")
+    one = sha(repo)
+    git(repo, "commit", "-q", "--allow-empty", "--no-verify", "-m", "chore(x): two")
+    git(repo, "checkout", "-q", "dev")
+    git(repo, "merge", "-q", "--no-ff", "--no-verify", "-m", "Merge branch 'chore/x' into dev", "-m",
+        "co-authored-by: B <b@x>", "chore/x")
+    merge = sha(repo)
+    problems = checks.trailer_problems(f"{before}..{merge}", cwd=repo)
+    assert len(problems) == 2
+    assert any(one[:7] in p for p in problems) and any(merge[:7] in p for p in problems)
+    # the format warnings stay as they were: the trailer is not one of them
+    assert all("Co-Authored-By" not in p for p in checks.commit_problems(f"{before}..{merge}", cwd=repo))
+
+
+def test_event_trailer_problems(repo):
+    base = sha(repo)
+    git(repo, "checkout", "-q", "-b", "chore/x")
+    git(repo, "commit", "-q", "--allow-empty", "--no-verify", "-m", "chore(x): one", "-m", "Co-Authored-By: A <a@x>")
+    git(repo, "commit", "-q", "--allow-empty", "--no-verify", "-m", "chore(x): two")
+    head = sha(repo)
+    assert len(checks.event_trailer_problems("pull_request", pr_event(repo, base, head), cwd=repo)) == 1
+    assert len(checks.event_trailer_problems("push", {"before": base, "after": head}, cwd=repo)) == 1
+    # a new branch: only the head commit, which is clean
+    assert checks.event_trailer_problems("push", {"before": gitutil.ZERO_SHA, "after": head}, cwd=repo) == []
+    assert checks.event_trailer_problems("push", {"before": head, "after": gitutil.ZERO_SHA}, cwd=repo) == []
+    assert checks.event_trailer_problems("workflow_dispatch", {}, cwd=repo) == []
+    broken = {"pull_request": {"head": {"sha": None}, "base": {"sha": None}}}
+    assert "could not be checked" in checks.event_trailer_problems("pull_request", broken, cwd=repo)[0]
+
+
+def test_check_trailers_cli_fails(repo, tmp_path):
+    base = sha(repo)
+    git(repo, "commit", "-q", "--allow-empty", "--no-verify", "-m", "chore(x): one", "-m", "Co-Authored-By: A <a@x>")
+    head = sha(repo)
+    tm = [sys.executable, str(ROOT / "scripts" / "tm.py"), "check-trailers"]
+    p = subprocess.run(tm + [f"{base}..{head}", "--git-dir", str(repo)], capture_output=True, text=True)
+    assert p.returncode == 1 and "error: commit" in p.stdout
+    ev = tmp_path / "event.json"
+    ev.write_text(json.dumps({"before": base, "after": head}))
+    p = subprocess.run(tm + ["--event", str(ev), "--event-name", "push", "--git-dir", str(repo)],
+                       capture_output=True, text=True, env={**os.environ, "GITHUB_ACTIONS": "true"})
+    assert p.returncode == 1 and "::error title=trailers::" in p.stdout
+    p = subprocess.run(tm + [f"{base}..{base}", "--git-dir", str(repo)], capture_output=True, text=True)
+    assert p.returncode == 0 and "no Co-Authored-By" in p.stdout
+    ev.write_text("not json")
+    p = subprocess.run(tm + ["--event", str(ev), "--event-name", "push"], capture_output=True, text=True)
+    assert p.returncode == 1 and "could not run" in p.stdout

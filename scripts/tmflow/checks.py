@@ -1,7 +1,8 @@
 """The format checks of the `checks` workflow (git.md 14), from a GitHub event.
 
-Every problem is a warning. Nothing here fails the job: the free plan cannot
-make a format rule blocking, so the owner holds the line (git.md 6).
+Every format problem is a warning: the free plan cannot make a format rule
+blocking, so the owner holds the line (git.md 6). The one exception is the
+`Co-Authored-By:` trailer (git.md 5): `trailer_problems` fails the job.
 """
 from __future__ import annotations
 
@@ -24,6 +25,11 @@ def commit_problems(rng: str, cwd: str | None = None) -> list[str]:
             continue
         for p in fmt.check_subject(c["subject"]):
             problems.append(f"commit {c['sha'][:7]}: {p}")
+        if not fmt.subject_exempt(c["subject"]):
+            refs = fmt.closing_refs(c["subject"] + "\n" + c.get("body", ""))
+            if refs:
+                problems.append(f"commit {c['sha'][:7]} closes {', '.join(refs)}: commits do not use "
+                                "Fixes/Closes (git.md 5), the PR body does")
     return problems
 
 
@@ -85,6 +91,40 @@ def push_problems(event: dict, cwd: str | None = None) -> list[str]:
         return commit_problems(after, cwd=cwd)
     except gitutil.GitError as e:
         return [f"could not read the pushed commits: {e}"]
+
+
+def trailer_problems(rng: str, cwd: str | None = None) -> list[str]:
+    """Commits in a range that carry a `Co-Authored-By:` trailer. Every commit counts:
+    merges, reverts and Dependabot too, so a merge cannot bring one in either."""
+    problems = []
+    for c in gitutil.commits(rng, cwd=cwd):
+        for p in fmt.check_no_coauthor(c["subject"] + "\n" + c.get("body", "")):
+            problems.append(f"commit {c['sha'][:7]}: {p}")
+    return problems
+
+
+def event_trailer_problems(event_name: str, event: dict, cwd: str | None = None) -> list[str]:
+    """`trailer_problems` over the commits of a PR or a push. Fails closed: commits that
+    cannot be read are a problem too."""
+    if event_name in ("pull_request", "pull_request_target") and "pull_request" in event:
+        pr = event["pull_request"]
+        base_sha, head_sha = pr["base"].get("sha"), pr["head"].get("sha")
+        if not base_sha or not head_sha:
+            return ["the event has no base or head commit: the trailers could not be checked"]
+        rng = f"{base_sha}..{head_sha}"
+    elif event_name == "push":
+        after = event.get("after")
+        if not after or after == gitutil.ZERO_SHA:
+            return []
+        rng = push_range(event)
+        if not (rng and gitutil.ok("cat-file", "-e", f"{event['before']}^{{commit}}", cwd=cwd)):
+            rng = after
+    else:
+        return []
+    try:
+        return trailer_problems(rng, cwd=cwd)
+    except gitutil.GitError as e:
+        return [f"could not read the commits {rng}: {e}"]
 
 
 def scan_range(event_name: str, event: dict) -> str | None:

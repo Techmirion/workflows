@@ -92,6 +92,29 @@ def cmd_check_format(a):
     return 0  # warnings only, never a blocker (git.md 14)
 
 
+def cmd_check_trailers(a):
+    """Fails on a `Co-Authored-By:` trailer (git.md 5): blocking, unlike the format checks."""
+    try:
+        if a.range:
+            problems = checks.trailer_problems(a.range, cwd=a.git_dir)
+        elif a.event and a.event_name:
+            problems = checks.event_trailer_problems(a.event_name, _event(a.event), cwd=a.git_dir)
+        else:
+            problems = ["give a RANGE, or --event and --event-name"]
+    except Exception as e:  # fail closed: an unchecked push is not a clean one
+        problems = [f"the trailer check could not run: {type(e).__name__}: {e}"]
+    gha = os.environ.get("GITHUB_ACTIONS") == "true"
+    for p in problems:
+        if gha:
+            msg = p.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+            print(f"::error title=trailers::{msg}")
+        else:
+            print(f"error: {p}")
+    if not problems:
+        print("trailers: no Co-Authored-By")
+    return 1 if problems else 0
+
+
 def cmd_secret_scan(a):
     ev = _event(a.event) if a.event else {}
     rng = checks.scan_range(a.event_name or "", ev)
@@ -323,6 +346,13 @@ def main(argv=None) -> int:
     sp.add_argument("--event-name", required=True)
     sp.add_argument("--git-dir", default=".")
     sp.set_defaults(fn=cmd_check_format)
+
+    sp = sub.add_parser("check-trailers", help="refuse Co-Authored-By trailers in a range or a GitHub event (blocking)")
+    sp.add_argument("range", nargs="?", help="a git range such as origin/dev..HEAD")
+    sp.add_argument("--event")
+    sp.add_argument("--event-name")
+    sp.add_argument("--git-dir", default=".")
+    sp.set_defaults(fn=cmd_check_trailers)
 
     sp = sub.add_parser("secret-scan", help="CI: gitleaks over the commits of a GitHub event")
     sp.add_argument("--event")
