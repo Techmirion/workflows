@@ -217,8 +217,7 @@ def apply(repo: str, steps: list[dict]) -> None:  # pragma: no cover - needs Git
             else:
                 print("   already there")
         elif k == "labels":
-            current = json.loads(_run(["gh", "api", "--paginate", "--slurp", f"repos/{repo}/labels"]).stdout)
-            current = [lab for page in current for lab in page]
+            current = labelmod.parse_pages(_run(["gh", "api", "--paginate", f"repos/{repo}/labels"]).stdout)
             for argv in labelmod.gh_commands(repo, labelmod.plan_labels(labelmod.load_labels(), current, s.get("prune"))):
                 _run(argv)
         elif k == "app":
