@@ -281,9 +281,9 @@ def cmd_labels(a):
     if a.current_file:
         current = json.loads(Path(a.current_file).read_text(encoding="utf-8"))
     else:
-        out = subprocess.run(["gh", "api", "--paginate", "--slurp", f"repos/{a.repo}/labels"],
+        out = subprocess.run(["gh", "api", "--paginate", f"repos/{a.repo}/labels"],
                              capture_output=True, text=True, check=True).stdout
-        current = [lab for page in json.loads(out) for lab in page]
+        current = labels.parse_pages(out)
     cmds = labels.gh_commands(a.repo, labels.plan_labels(desired, current, a.prune))
     if not cmds:
         print("labels: already in step")
