@@ -1,6 +1,6 @@
 # Reusable workflow: tests, lint, gitleaks and the format checks (git.md 6 and 14).
 # Callers run it on every PR into dev or main and on every push to dev and main.
-# Tests, lint and gitleaks fail the check; the format checks only warn.
+# Tests, lint, gitleaks and a Co-Authored-By trailer fail the check; the format checks only warn.
 name: checks
 
 on:
@@ -114,6 +114,12 @@ jobs:
           sh wf/scripts/install-gitleaks.sh "$GITLEAKS_VERSION" "$RUNNER_TEMP/bin"
           python3 wf/scripts/tm.py secret-scan --event "$GITHUB_EVENT_PATH" --event-name "$GITHUB_EVENT_NAME" \
             --gitleaks "$RUNNER_TEMP/bin/gitleaks" --source repo
+
+      - name: Commit trailers (Co-Authored-By fails the check)
+        if: ${{ !cancelled() }}
+        run: >-
+          python3 wf/scripts/tm.py check-trailers --event "$GITHUB_EVENT_PATH"
+          --event-name "$GITHUB_EVENT_NAME" --git-dir repo
 
       - name: Format checks (warnings, never blocking)
         if: ${{ !cancelled() }}

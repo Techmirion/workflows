@@ -167,3 +167,11 @@ def test_every_path_in_template_list_exists():
     for rel in repoinit.TEMPLATE_FILES:
         assert (ROOT / "templates" / rel).exists(), rel
     assert Path(ROOT / "templates" / "gitignore").exists()
+
+
+def test_checks_fail_on_a_coauthor_trailer():
+    steps = load(WF / "checks.yml")["jobs"]["checks"]["steps"]
+    trailer = [s for s in steps if "check-trailers" in s.get("run", "")]
+    assert len(trailer) == 1
+    assert "continue-on-error" not in trailer[0]
+    assert trailer[0]["if"] == "${{ !cancelled() }}"
