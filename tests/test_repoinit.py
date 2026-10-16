@@ -53,6 +53,33 @@ def test_files_and_hooks_for_a_clone(tmp_path):
     assert "* @patriarxis @DEPUTY" in text
 
 
+def test_agents_notes_for_every_assistant(tmp_path):
+    rels = repoinit.TEMPLATE_FILES
+    assert "AGENTS.md" in rels and "CLAUDE.md" in rels
+    # Claude reads CLAUDE.md, which only imports AGENTS.md: one file to keep up to date.
+    assert (repoinit.TEMPLATES / "CLAUDE.md").read_text(encoding="utf-8") == "@AGENTS.md\n"
+    src = repoinit.TEMPLATES / "AGENTS.md"
+    assert src.read_text(encoding="utf-8").startswith("# REPO\n")
+    text = repoinit.render_template(src, "patriarxis", None, "Techmirion/scam-shield")
+    assert text.startswith("# scam-shield\n") and "REPO" not in text
+    assert repoinit.render_template(src, None, None).startswith("# REPO\n")  # no repo: left for the owner
+    steps = repoinit.plan("Techmirion/app", clone=str(tmp_path), owner="patriarxis")
+    assert next(s for s in steps if s["kind"] == "files")["repo"] == "Techmirion/app"
+
+
+def test_agents_stub_never_hides_an_existing_claude_md(tmp_path):
+    (tmp_path / "CLAUDE.md").write_text("the repo's real notes\n")
+    assert repoinit.skip_reason(tmp_path / "AGENTS.md")
+    assert repoinit.skip_reason(tmp_path / "CLAUDE.md") is None
+    steps = [s for s in repoinit.plan("T/app", clone=str(tmp_path)) if s["kind"] == "files"]
+    out = repoinit.describe(steps, "T/app")
+    assert f"skip {tmp_path / 'AGENTS.md'}" in out and f"keep {tmp_path / 'CLAUDE.md'}" in out
+    repoinit.apply("T/app", steps)
+    assert not (tmp_path / "AGENTS.md").exists()
+    assert (tmp_path / "CLAUDE.md").read_text() == "the repo's real notes\n"
+    assert (tmp_path / ".github" / "pull_request_template.md").exists()
+
+
 def test_cli_dry_run_never_calls_gh(tmp_path):
     d = tmp_path / "fakebin"
     d.mkdir()

@@ -19,4 +19,6 @@ Fixes #
 
 - [ ] No secrets, personal data or generated output in the diff (git.md 11)
 - [ ] Tests or a check cover the change, or I say above why not
+- [ ] It changes a UI: I looked at it 390 and 1280 wide, in light and dark, and used it with the keyboard (web.md)
+- [ ] It changes snapshots or golden files: I looked at each diff and say above why it changed (testing.md)
 - [ ] An AI assistant did part of this work: <!-- say which, and what a person checked -->
