@@ -69,6 +69,23 @@ def test_labels_cli_dry_run_changes_nothing(tmp_path):
 
 # --- reviewers -----------------------------------------------------------------
 
+def test_parse_pages_reads_paginate_output_without_slurp():
+    one = [{"name": "bug"}, {"name": "docs"}]
+    two = [{"name": "wip"}]
+    plain = json.dumps(one) + json.dumps(two)              # gh api --paginate, gh 2.45
+    pretty = json.dumps(one, indent=2) + "\n" + json.dumps(two, indent=2) + "\n"
+    slurped = json.dumps([one, two])                        # gh api --paginate --slurp
+    for text in (plain, pretty, slurped):
+        assert [lab["name"] for lab in labels.parse_pages(text)] == ["bug", "docs", "wip"]
+    assert labels.parse_pages("") == []
+    assert labels.parse_pages("[]") == []
+
+
+def test_no_slurp_in_gh_calls():
+    for f in ("cli.py", "repoinit.py"):
+        assert "--slurp" not in (ROOT / "scripts" / "tmflow" / f).read_text(encoding="utf-8")
+
+
 def test_parse_codeowners():
     co = reviewers.parse_codeowners("# comment\n* @fotis @marios\n/docs/ @someone\n")
     assert co == {"owner": "fotis", "deputy": "marios"}

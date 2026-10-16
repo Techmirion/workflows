@@ -8,6 +8,25 @@ from pathlib import Path
 LABELS_FILE = Path(__file__).resolve().parents[2] / "labels.json"
 
 
+def parse_pages(text: str) -> list[dict]:
+    """The items of `gh api --paginate` output, one JSON array per page, concatenated.
+
+    No `--slurp`: gh 2.45, the boxes' version, does not have it (#4). An array of
+    pages, as `--slurp` prints it, is read too.
+    """
+    items, dec, i, text = [], json.JSONDecoder(), 0, text or ""
+    while True:
+        while i < len(text) and text[i].isspace():
+            i += 1
+        if i == len(text):
+            return items
+        page, i = dec.raw_decode(text, i)
+        if page and all(isinstance(x, list) for x in page):
+            items.extend(x for sub in page for x in sub)
+        else:
+            items.extend(page)
+
+
 def load_labels(path: str | Path | None = None) -> list[dict]:
     data = json.loads(Path(path or LABELS_FILE).read_text(encoding="utf-8"))
     for lab in data:
