@@ -6,8 +6,9 @@
   reference (the case where the subject was written in the editor).
 - Refuses a subject that does not match the format, and a message that uses a
   closing keyword (`Fixes #N`): a commit does not finish an issue, the release does.
-- Exempt: merge and revert commits. fixup!/squash! commits pass here (they are
-  squashed before review); CI warns if one reaches a PR.
+- Refuses a `Co-Authored-By:` trailer, in every commit: merges and reverts too.
+- Exempt from the format: merge and revert commits. fixup!/squash! commits pass
+  here (they are squashed before review); CI warns if one reaches a PR.
 """
 import os
 import subprocess
@@ -29,16 +30,32 @@ def comment_char():
     return c if c and c != "auto" else "#"
 
 
+def refuse(problems, show_format):
+    sys.stderr.write("commit refused by the Techmirion commit-msg hook:\n")
+    for p in problems:
+        sys.stderr.write(f"  - {p}\n")
+    if show_format:
+        sys.stderr.write(
+            "  format: type(place): message (#N), type one of " + ", ".join(fmt.TYPES) + "\n"
+            "  example: fix(auth): redirect after login (#34)\n"
+        )
+    sys.stderr.write(
+        "  your message is kept in .git/COMMIT_EDITMSG; edit it with: git commit -e -F .git/COMMIT_EDITMSG\n"
+    )
+    return 1
+
+
 def main(argv):
     if len(argv) < 2:
         return 0
     path = argv[1]
     gd = git("rev-parse", "--git-dir") or ".git"
-    if os.path.exists(os.path.join(gd, "MERGE_HEAD")):
-        return 0
     cc = comment_char()
     with open(path, encoding="utf-8") as f:
         text = f.read()
+    coauthor = fmt.check_no_coauthor("\n".join(fmt.message_lines(text, cc)))
+    if os.path.exists(os.path.join(gd, "MERGE_HEAD")):
+        return refuse(coauthor, show_format=False) if coauthor else 0
     subject = fmt.subject_of(text, cc)
     if not subject:
         return 0  # git aborts an empty message by itself
@@ -58,17 +75,9 @@ def main(argv):
                 f"the message closes {', '.join(refs)}: commits do not use Fixes/Closes "
                 "(git.md 5); put `Fixes #N` in the PR body instead"
             )
-    if not problems:
+    if not problems and not coauthor:
         return 0
-    sys.stderr.write("commit refused by the Techmirion commit-msg hook:\n")
-    for p in problems:
-        sys.stderr.write(f"  - {p}\n")
-    sys.stderr.write(
-        "  format: type(place): message (#N), type one of " + ", ".join(fmt.TYPES) + "\n"
-        "  example: fix(auth): redirect after login (#34)\n"
-        "  your message is kept in .git/COMMIT_EDITMSG; edit it with: git commit -e -F .git/COMMIT_EDITMSG\n"
-    )
-    return 1
+    return refuse(coauthor + problems, show_format=bool(problems))
 
 
 if __name__ == "__main__":

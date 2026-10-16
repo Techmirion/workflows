@@ -191,3 +191,42 @@ def test_same_hooks_through_pre_commit(tmp_path):
     assert subject(app) == "feat(ui): a thing (#5)"
     p = commit_file(app, "b.txt", "1", "bad message", check=False, env=env)
     assert p.returncode != 0
+
+
+def test_coauthor_trailer_refused(hooked_repo):
+    env = env_with_gitleaks()
+    git(hooked_repo, "checkout", "-q", "-b", "chore/x")
+    head = git(hooked_repo, "rev-parse", "HEAD").stdout
+    Path(hooked_repo, "a.txt").write_text("1")
+    git(hooked_repo, "add", "a.txt")
+    p = git(hooked_repo, "commit", "-q", "-m", "chore(x): fine subject", "-m",
+            "Co-Authored-By: Someone <s@example.invalid>", check=False, env=env)
+    assert p.returncode != 0
+    assert "Co-Authored-By" in p.stderr
+    assert "format:" not in p.stderr  # the subject itself was fine
+    assert git(hooked_repo, "rev-parse", "HEAD").stdout == head
+
+
+def test_coauthor_trailer_refused_on_a_merge(hooked_repo):
+    env = env_with_gitleaks()
+    git(hooked_repo, "checkout", "-q", "-b", "dev")
+    git(hooked_repo, "checkout", "-q", "-b", "chore/x")
+    commit_file(hooked_repo, "a.txt", "1", "chore(x): one", env=env)
+    git(hooked_repo, "checkout", "-q", "dev")
+    p = git(hooked_repo, "merge", "-q", "--no-ff", "-m", "Merge branch 'chore/x' into dev", "-m",
+            "Co-authored-by: Someone <s@example.invalid>", "chore/x", check=False, env=env)
+    assert p.returncode != 0
+    assert "Co-Authored-By" in p.stderr
+    git(hooked_repo, "merge", "--abort")
+    git(hooked_repo, "merge", "-q", "--no-ff", "--no-edit", "chore/x", env=env)
+    assert subject(hooked_repo) == "Merge branch 'chore/x' into dev"
+
+
+def test_coauthor_below_the_scissors_is_ignored(hooked_repo, tmp_path):
+    editor = tmp_path / "editor.sh"
+    editor.write_text('#!/bin/sh\n{ echo "chore(x): verbose"; cat "$1"; } > "$1.new" && mv "$1.new" "$1"\n')
+    editor.chmod(0o755)
+    Path(hooked_repo, "a.txt").write_text("Co-Authored-By: in the diff only\n")
+    git(hooked_repo, "add", "a.txt")
+    git(hooked_repo, "commit", "-q", "-v", env={**env_with_gitleaks(), "GIT_EDITOR": str(editor)})
+    assert subject(hooked_repo) == "chore(x): verbose"

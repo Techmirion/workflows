@@ -27,7 +27,7 @@
   stages: [prepare-commit-msg]
 - id: commit-format
   name: commit message format
-  description: "Refuse a subject that is not `type(place): message (#N)`, and Fixes/Closes in commits."
+  description: "Refuse a subject that is not `type(place): message (#N)`, Fixes/Closes in commits, and Co-Authored-By trailers."
   entry: hooks/commit-msg
   language: script
   always_run: true
