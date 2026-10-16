@@ -2,6 +2,7 @@
 # On the `*` line: the FIRST handle is the owner, the SECOND is the deputy.
 # The `assign-reviewers` workflow requests the owner on every PR, and the deputy
 # when the owner opened it.
-# TODO(deputy): the deputy is not named yet. Add their handle after the owner:
-#   * @patriarxis @<deputy>
-* @patriarxis
+# Fotis is owner and deputy until a second person is named. GitHub never lets an
+# author approve their own PR: on this repo, org owners may merge their own PRs
+# (ruleset bypass, pull requests only).
+* @patriarxis @patriarxis
