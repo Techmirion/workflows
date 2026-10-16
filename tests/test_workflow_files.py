@@ -136,6 +136,13 @@ def test_pr_template_matches_the_body_check():
     assert fmt.check_body(text.replace("- [ ] No issue needed", "- [x] No issue needed")) == []
 
 
+def test_own_pr_template_is_the_template():
+    own = (ROOT / ".github" / "pull_request_template.md").read_text()
+    assert own == (ROOT / "templates" / ".github" / "pull_request_template.md").read_text()
+    for line in ("It changes a UI:", "It changes snapshots or golden files:"):
+        assert line in own
+
+
 def test_dependabot_template():
     doc = load(ROOT / "templates" / ".github" / "dependabot.yml")
     for u in doc["updates"]:
