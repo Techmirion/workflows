@@ -239,3 +239,30 @@ def test_version_from_body():
     assert fmt.version_from_body("Version: 1.4.0") is None
     assert fmt.version_from_body("<!-- Version: v9.9.9 -->") is None
     assert fmt.version_from_body("") is None
+
+
+# --- Co-Authored-By (git.md 5) ----------------------------------------------
+
+@pytest.mark.parametrize("text", [
+    "fix(a): b\n\nCo-Authored-By: Someone <s@example.invalid>",
+    "fix(a): b\n\nco-authored-by: Someone <s@example.invalid>\n",
+    "fix(a): b\n\n  CO-AUTHORED-BY : Someone",
+    "fix(a): b\n\nSigned-off-by: Me <m@example.invalid>\nCo-authored-by:Someone",
+    "Merge branch 'x' into dev\n\nCo-Authored-By: Someone",
+])
+def test_coauthor_trailer_found(text):
+    assert len(fmt.coauthor_lines(text)) == 1
+    problems = fmt.check_no_coauthor(text)
+    assert len(problems) == 1 and "Co-Authored-By" in problems[0]
+
+
+@pytest.mark.parametrize("text", [
+    "fix(a): b",
+    "fix(a): b\n\nWritten together, co-authored by the team.",
+    "fix(a): b\n\nSigned-off-by: Me <m@example.invalid>",
+    "docs(git): say that Co-Authored-By: lines are refused",  # not at the start of a line
+    "",
+])
+def test_no_coauthor_trailer(text):
+    assert fmt.coauthor_lines(text) == []
+    assert fmt.check_no_coauthor(text) == []

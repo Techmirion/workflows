@@ -11,7 +11,7 @@ What is here:
 | `.github/workflows/{checks,assign-reviewers,cleanup,release-pr,release}.yml` | the reusable workflows (`on: workflow_call`) |
 | `.github/workflows/self-*.yml` | this repo's own callers of the same workflows |
 | `templates/` | ready-to-copy files for a repo: the five caller workflows, PR template, issue forms, CODEOWNERS, dependabot, pre-commit config, the `.gitignore` block of section 11 |
-| `hooks/` | the git hooks: `pre-commit` (gitleaks), `prepare-commit-msg` (adds `(#N)`), `commit-msg` (checks the format) |
+| `hooks/` | the git hooks: `pre-commit` (gitleaks), `prepare-commit-msg` (adds `(#N)`), `commit-msg` (checks the format, refuses `Co-Authored-By:`) |
 | `.pre-commit-hooks.yaml` | the same hooks, for `pre-commit` |
 | `labels.json` | the one label set (section 13), plus `wip` (section 6) |
 | `scripts/tm.py` + `scripts/tmflow/` | all the logic, Python standard library only; the workflows only call it |
@@ -36,7 +36,7 @@ jobs:
 
 | Caller | Trigger | Does |
 |---|---|---|
-| `checks.yml` | PR into dev or main (opened, synchronize, reopened, edited); push to dev or main | tests, lint, gitleaks over the new commits; format checks of branch, commits, PR title and body as **warnings** |
+| `checks.yml` | PR into dev or main (opened, synchronize, reopened, edited); push to dev or main | tests, lint, gitleaks and `Co-Authored-By:` trailers over the new commits (these fail); format checks of branch, commits, PR title and body as **warnings** |
 | `assign-reviewers.yml` | `pull_request_target` opened, reopened | requests the owner from CODEOWNERS, or the deputy when the owner wrote the PR |
 | `cleanup.yml` | PR closed and merged | deletes the head branch; never `dev`, `main`, the default branch, a fork's branch, or a branch with commits that were not merged |
 | `release-pr.yml` | by hand (Actions tab or the hub) with a version | refuses unless main is an ancestor of dev and the version is above the last tag; opens `release: vX.Y.Z <summary>` with `Version: vX.Y.Z`, the merged PRs and one `Fixes #N` per completed issue (reverted PRs left out) |
@@ -51,6 +51,7 @@ Format rules (`scripts/tmflow/fmt.py`):
 
 - branch `type/N-topic` or `type/topic`, type one of `feat fix chore docs refactor test hotfix`; exempt `dev`, `main`, `dependabot/*`;
 - commit subject and PR title `type(place): message`, optional `(#N)`, `(#N, #M)`, `(Owner/repo#N)` at the end; PR titles may also be `release: vX.Y.Z <summary>`; exempt merges, reverts, Dependabot and the sync PR;
+- no commit carries a `Co-Authored-By:` trailer, merges, reverts and bots included: the `commit-msg` hook refuses it and `checks` fails on it (`tm.py check-trailers`, also usable locally: `python3 scripts/tm.py check-trailers origin/dev..HEAD`);
 - PR body: a line `Fixes #N` or `Refs #N`, or `- [x] No issue needed`.
 
 ## Hooks

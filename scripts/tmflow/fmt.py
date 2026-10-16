@@ -69,6 +69,8 @@ CLOSING_RE = re.compile(
     rf"\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)[ \t]*:?[ \t]+(?P<ref>{REF})\b", re.I
 )
 HTML_COMMENT_RE = re.compile(r"<!--.*?-->", re.S)
+#: A `Co-Authored-By:` trailer, in any case. Commits never carry one (git.md 5).
+COAUTHOR_RE = re.compile(r"^[ \t]*co-authored-by[ \t]*:.*$", re.I | re.M)
 
 VERSION_RE = re.compile(r"^v?(?P<major>0|[1-9][0-9]*)\.(?P<minor>0|[1-9][0-9]*)\.(?P<patch>0|[1-9][0-9]*)$")
 #: Release tags. Exactly `vMAJOR.MINOR.PATCH`; the moving `v1` of the workflows repo is not one.
@@ -226,6 +228,18 @@ def add_ref_to_message(text: str, issue: int, comment_char: str = "#") -> str:
             lines[i] = add_issue_ref(line, issue)
             return "\n".join(lines)
     return text
+
+
+def coauthor_lines(text: str) -> list[str]:
+    """Every `Co-Authored-By:` line of a commit message, stripped, in order."""
+    return [m.group(0).strip() for m in COAUTHOR_RE.finditer(text or "")]
+
+
+def check_no_coauthor(text: str) -> list[str]:
+    """Refuse a `Co-Authored-By:` trailer (git.md 5). No exemption: merges, reverts and bots too."""
+    if not coauthor_lines(text):
+        return []
+    return ["the message has a `Co-Authored-By:` trailer: commits never carry one (git.md 5), remove the line"]
 
 
 # --- PR bodies --------------------------------------------------------------
