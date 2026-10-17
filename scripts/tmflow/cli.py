@@ -257,20 +257,45 @@ def cmd_release(a):
         elif act[0] == "move-tag":
             forge.move_tag(act[1], act[2])
             done.append(f"moved {act[1]} to {act[2][:7]}")
-        elif act[0] == "fast-forward-dev":
-            if forge.fast_forward("dev", act[1]):
-                done.append(f"fast-forwarded dev to {act[1][:7]}")
-            elif forge.open_prs(head="main", base="dev"):
-                done.append("dev moved meanwhile; a sync PR is already open")
-            else:
-                pr = forge.create_pr(releaselib.SYNC_TITLE, releaselib.sync_body(plan["version"], {"number": plan["pr"]}),
-                                     head="main", base="dev")
-                done.append(f"dev moved meanwhile: opened sync PR #{pr['number']}")
-        elif act[0] == "sync-pr":
-            pr = forge.create_pr(act[1], act[2], head="main", base="dev")
-            done.append(f"dev has moved: opened sync PR #{pr['number']} ({act[1]})")
+        elif act[0] in ("fast-forward-dev", "sync-pr"):
+            done.append(_sync_dev(forge, act, releaselib.sync_body(plan["version"], {"number": plan["pr"]})))
     head = f"release: {plan['kind']}" + (f" {plan['version']} (PR #{plan.get('pr')})" if plan["version"] else "")
     _summary("\n".join([head] + ([f"- {d}" for d in done] or ["- nothing to do"])))
+    return 0
+
+
+def _sync_dev(forge, act, body):
+    """Carry out one action of releaselib.plan_sync; returns what was done."""
+    if act[0] == "fast-forward-dev":
+        if forge.fast_forward("dev", act[1]):
+            return f"fast-forwarded dev to {act[1][:7]}"
+        if forge.open_prs(head="main", base="dev"):
+            return "dev moved meanwhile; a sync PR is already open"
+        pr = forge.create_pr(releaselib.SYNC_TITLE, body, head="main", base="dev")
+        return f"dev moved meanwhile: opened sync PR #{pr['number']}"
+    pr = forge.create_pr(act[1], act[2], head="main", base="dev")
+    return f"dev has moved: opened sync PR #{pr['number']} ({act[1]})"
+
+
+def cmd_sync_dev(a):
+    """After a push to main: fast-forward dev, or open the sync PR. Never tags or releases."""
+    forge = _forge(a)
+    _fetch(a)
+    sha = gitutil.rev(a.sha, cwd=a.git_dir)
+    dev_sha = gitutil.try_rev(f"{a.remote}/dev", cwd=a.git_dir)
+    prs = _merged_prs_for(forge, sha, a.git_dir)
+    body = releaselib.sync_dev_body(sha, prs[0] if prs else None)
+    actions, warnings = releaselib.plan_sync(
+        sha=sha, dev_exists=dev_sha is not None,
+        sha_is_ancestor_of_dev=bool(dev_sha) and gitutil.is_ancestor(sha, dev_sha, cwd=a.git_dir),
+        dev_is_ancestor_of_sha=bool(dev_sha) and gitutil.is_ancestor(dev_sha, sha, cwd=a.git_dir),
+        open_sync_prs=forge.open_prs(head="main", base="dev") if dev_sha else [], body=body)
+    for w in warnings:
+        _emit("warning", w)
+    done = [f"(dry run) {act[0]} {act[1]}" if a.dry_run else _sync_dev(forge, act, body) for act in actions]
+    if not actions and not warnings:
+        done = ["dev already contains main"]
+    _summary("\n".join([f"sync-dev: main {sha[:7]}"] + [f"- {d}" for d in done or warnings]))
     return 0
 
 
@@ -392,6 +417,13 @@ def main(argv=None) -> int:
     sp.add_argument("--app-slug", default=os.environ.get("APP_SLUG"))
     sp.add_argument("--dry-run", action="store_true")
     sp.set_defaults(fn=cmd_release)
+
+    sp = sub.add_parser("sync-dev", help="after a push to main: fast-forward dev, or open the sync PR")
+    forge_args(sp)
+    git_args(sp)
+    sp.add_argument("--sha", required=True, help="the commit pushed to main")
+    sp.add_argument("--dry-run", action="store_true")
+    sp.set_defaults(fn=cmd_sync_dev)
 
     sp = sub.add_parser("labels")
     sp.add_argument("--repo", required=True)

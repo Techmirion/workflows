@@ -8,7 +8,7 @@ import yaml
 from conftest import ROOT
 from tmflow import fmt, labels
 
-REUSABLE = ["checks", "assign-reviewers", "cleanup", "release-pr", "release"]
+REUSABLE = ["checks", "assign-reviewers", "cleanup", "release-pr", "release", "sync-dev"]
 WF = ROOT / ".github" / "workflows"
 TPL = ROOT / "templates" / ".github" / "workflows"
 ALL = sorted(WF.glob("*.yml")) + sorted(TPL.glob("*.yml"))
@@ -78,10 +78,10 @@ def test_no_secrets_inherit_and_no_default_token_for_writes(path):
 
 
 def test_writes_go_through_the_automation_app():
-    for name in ("release-pr", "release"):
+    for name in ("release-pr", "release", "sync-dev"):
         doc = load(WF / f"{name}.yml")
         steps = doc["jobs"][name]["steps"]
-        app = steps[0]
+        app = next(s for s in steps if s.get("id") == "app")
         assert app["uses"].startswith("actions/create-github-app-token@")
         assert app["with"]["private-key"] == "${{ secrets.AUTOMATION_APP_KEY }}"
         run = steps[-1]
@@ -105,6 +105,20 @@ def test_template_triggers():
     assert on(load(TPL / "cleanup.yml"))["pull_request"]["types"] == ["closed"]
     assert "workflow_dispatch" in on(load(TPL / "release-pr.yml"))
     assert on(load(TPL / "release.yml"))["push"]["branches"] == ["main"]
+    assert on(load(TPL / "sync-dev.yml"))["push"]["branches"] == ["main"]
+
+
+def test_sync_dev_is_not_copied_by_repo_init():
+    """A repo on the full flow syncs through release; running both would race."""
+    from tmflow import repoinit
+    assert ".github/workflows/sync-dev.yml" not in repoinit.TEMPLATE_FILES
+    assert ".github/workflows/release.yml" in repoinit.TEMPLATE_FILES
+
+
+def test_sync_dev_says_what_is_missing_without_the_app_secrets():
+    steps = load(WF / "sync-dev.yml")["jobs"]["sync-dev"]["steps"]
+    assert "AUTOMATION_APP_KEY" in steps[0]["run"] and "exit 1" in steps[0]["run"]
+    assert steps[1].get("id") == "app"
 
 
 def test_self_callers_use_local_workflows():
