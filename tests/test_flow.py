@@ -121,6 +121,40 @@ def test_issue_to_release_to_hotfix(world, capsys):
     assert f"Fixes #{k}" in body and f"Fixes #{h}" not in body and "sync main into dev" not in body
 
 
+def test_sync_dev_outside_the_release_flow(world):
+    """A repo without release.yml: dev merged into main by hand, then sync-dev."""
+    f, me = world["forge"], world["me"]
+    work(world, "feat/site", "dev", "feat(site): first page")
+    p = f.create_pr("feat(site): first page", "- [x] No issue needed", "feat/site", "dev")
+    f.merge_pr(p["number"])
+    git(me, "fetch", "-q", "origin")
+    git(me, "checkout", "-q", "-B", "main", "origin/main")
+    git(me, "merge", "-q", "--no-ff", "-m", "feat(site): merge dev into main", "origin/dev")
+    git(me, "push", "-q", "origin", "main")
+    sha = remote(world, "main")
+    assert remote(world, "dev") != sha
+
+    assert tm(world, "sync-dev", "--sha", sha, *git_args(world)) == 0
+    assert remote(world, "dev") == sha  # fast-forwarded
+    assert git(world["origin"], "tag").stdout.strip() == ""  # never tags
+    assert tm(world, "sync-dev", "--sha", sha, *git_args(world)) == 0  # rerun: nothing to do
+    assert f.open_prs(head="main", base="dev") == []
+
+    # dev moves on before the sync runs: one sync PR, never two
+    git(me, "commit", "-q", "--allow-empty", "-m", "chore(site): straight on main")
+    git(me, "push", "-q", "origin", "main")
+    work(world, "chore/more", "dev", "chore(site): more")
+    f.merge_pr(f.create_pr("chore(site): more", "- [x] No issue needed", "chore/more", "dev")["number"])
+    sha2 = remote(world, "main")
+    assert tm(world, "sync-dev", "--sha", sha2, *git_args(world)) == 0
+    assert tm(world, "sync-dev", "--sha", sha2, *git_args(world)) == 0
+    (sync,) = f.open_prs(head="main", base="dev")
+    assert sync["title"] == "chore(release): sync main into dev"
+    assert "a push without a pull request" in sync["body"]
+    f.merge_pr(sync["number"])
+    assert gitutil.ok("merge-base", "--is-ancestor", sha2, remote(world, "dev"), cwd=str(world["origin"]))
+
+
 def test_first_parent_commits_reads_pr_merges(world):
     f = world["forge"]
     work(world, "chore/one", "dev", "chore(a): one")

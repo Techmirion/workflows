@@ -1,0 +1,25 @@
+# Caller of the shared `sync-dev` workflow (Techmirion/workflows, git.md 9).
+# Only for a repo NOT on the full flow (no release.yml here): on every push to
+# main, fast-forward dev to main, or open the sync PR if dev has moved on.
+# Needs the repo secrets AUTOMATION_APP_ID and AUTOMATION_APP_KEY.
+name: sync-dev
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync-dev
+  cancel-in-progress: false
+
+jobs:
+  sync-dev:
+    uses: Techmirion/workflows/.github/workflows/sync-dev.yml@v1
+    with:
+      workflows-ref: v1
+    secrets:
+      AUTOMATION_APP_ID: ${{ secrets.AUTOMATION_APP_ID }}
+      AUTOMATION_APP_KEY: ${{ secrets.AUTOMATION_APP_KEY }}
