@@ -8,9 +8,9 @@ What is here:
 
 | Path | What it is |
 |---|---|
-| `.github/workflows/{checks,assign-reviewers,cleanup,release-pr,release}.yml` | the reusable workflows (`on: workflow_call`) |
+| `.github/workflows/{checks,assign-reviewers,cleanup,release-pr,release,sync-dev}.yml` | the reusable workflows (`on: workflow_call`) |
 | `.github/workflows/self-*.yml` | this repo's own callers of the same workflows |
-| `templates/` | ready-to-copy files for a repo: the five caller workflows, PR template, issue forms, CODEOWNERS, dependabot, pre-commit config, the `.gitignore` block of section 11 |
+| `templates/` | ready-to-copy files for a repo: the five caller workflows (plus `sync-dev.yml`, see below), PR template, issue forms, CODEOWNERS, dependabot, pre-commit config, the `.gitignore` block of section 11 |
 | `hooks/` | the git hooks: `pre-commit` (gitleaks), `prepare-commit-msg` (adds `(#N)`), `commit-msg` (checks the format, refuses `Co-Authored-By:`) |
 | `.pre-commit-hooks.yaml` | the same hooks, for `pre-commit` |
 | `labels.json` | the one label set (section 13), plus `wip` (section 6) |
@@ -41,8 +41,15 @@ jobs:
 | `cleanup.yml` | PR closed and merged | deletes the head branch; never `dev`, `main`, the default branch, a fork's branch, or a branch with commits that were not merged |
 | `release-pr.yml` | by hand (Actions tab or the hub) with a version | refuses unless main is an ancestor of dev and the version is above the last tag; opens `release: vX.Y.Z <summary>` with `Version: vX.Y.Z`, the merged PRs and one `Fixes #N` per completed issue (reverted PRs left out) |
 | `release.yml` | push to main | finds the merged PR; version from `Version:` (release) or next patch (head `hotfix/*`); annotated tag; GitHub Release; fast-forwards dev, or opens `chore(release): sync main into dev` if dev moved |
+| `sync-dev.yml` | push to main | **only for a repo not on the full flow** (no `release.yml`): fast-forwards dev to main, or opens `chore(release): sync main into dev` if dev moved; never tags or releases. Not copied by `repo-init` |
 
-`release-pr` and `release` need the automation App: the repo passes
+Why `sync-dev`: merging `dev` into `main` leaves the merge commit on `main`
+only, so `dev` falls one commit behind with every merge. On the full flow
+`release` brings it back. A repo that merges `dev` into `main` without a
+release PR copies `templates/.github/workflows/sync-dev.yml` instead. Do not
+use both: they would race.
+
+`release-pr`, `release` and `sync-dev` need the automation App: the repo passes
 `AUTOMATION_APP_ID` and `AUTOMATION_APP_KEY` as secrets (see the templates).
 On the free plan, organisation secrets do not reach private repos, so private
 repos need them as repo secrets (`repo-init` prints the commands).
