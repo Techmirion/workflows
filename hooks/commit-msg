@@ -7,6 +7,8 @@
 - Refuses a subject that does not match the format, and a message that uses a
   closing keyword (`Fixes #N`): a commit does not finish an issue, the release does.
 - Refuses a `Co-Authored-By:` trailer, in every commit: merges and reverts too.
+- `git config techmirion.hooks warn` turns every refusal into a warning: the
+  commit is kept and `tm.py doctor --fix` (or the team skill) fixes it before the push.
 - Exempt from the format: merge and revert commits. fixup!/squash! commits pass
   here (they are squashed before review); CI warns if one reaches a PR.
 """
@@ -31,7 +33,11 @@ def comment_char():
 
 
 def refuse(problems, show_format):
-    sys.stderr.write("commit refused by the Techmirion commit-msg hook:\n")
+    warn_only = (git("config", "techmirion.hooks") or "").lower() == "warn"
+    if warn_only:
+        sys.stderr.write("warning from the Techmirion commit-msg hook (techmirion.hooks=warn, so the commit is kept):\n")
+    else:
+        sys.stderr.write("commit refused by the Techmirion commit-msg hook:\n")
     for p in problems:
         sys.stderr.write(f"  - {p}\n")
     if show_format:
@@ -39,6 +45,9 @@ def refuse(problems, show_format):
             "  format: type(place): message (#N), type one of " + ", ".join(fmt.TYPES) + "\n"
             "  example: fix(auth): redirect after login (#34)\n"
         )
+    if warn_only:
+        sys.stderr.write("  fix it before you push: `tm.py doctor --fix` rewords unpushed commits; CI still fails on Co-Authored-By\n")
+        return 0
     sys.stderr.write(
         "  your message is kept in .git/COMMIT_EDITMSG; edit it with: git commit -e -F .git/COMMIT_EDITMSG\n"
     )
