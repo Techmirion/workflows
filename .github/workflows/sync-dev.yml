@@ -1,0 +1,86 @@
+# Reusable workflow: after a push to main, bring main back into dev (git.md 9).
+# For repos that are NOT on the full flow (no release.yml): those merge dev into
+# main without a release PR, so `release` never syncs them. Fast-forwards dev to
+# main, or opens `chore(release): sync main into dev` if dev has commits main has
+# not (unless one is open). Never tags or releases. A repo on the full flow does
+# not call this: `release` already syncs, and running both would race.
+# Writes use a short-lived token of the automation App (git.md 14).
+name: sync-dev
+
+on:
+  workflow_call:
+    inputs:
+      workflows-repo:
+        description: The repo holding the shared scripts.
+        type: string
+        default: Techmirion/workflows
+      workflows-ref:
+        description: Ref of the shared scripts. Keep it equal to the ref in the caller's `uses:` line.
+        type: string
+        default: v1
+      runs-on:
+        description: Runner label.
+        type: string
+        default: ubuntu-24.04
+    secrets:
+      AUTOMATION_APP_ID:
+        description: Id (or client id) of the Techmirion automation App.
+        required: true
+      AUTOMATION_APP_KEY:
+        description: Private key of the Techmirion automation App.
+        required: true
+
+permissions: {}
+
+jobs:
+  sync-dev:
+    name: sync-dev
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: The repo has the App secrets
+        env:
+          HAVE_ID: ${{ secrets.AUTOMATION_APP_ID != '' }}
+          HAVE_KEY: ${{ secrets.AUTOMATION_APP_KEY != '' }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [ "$HAVE_ID" != "true" ] || [ "$HAVE_KEY" != "true" ]; then
+            msg="sync-dev needs the repo secrets AUTOMATION_APP_ID and AUTOMATION_APP_KEY"
+            msg="$msg (on the free plan, organisation secrets do not reach private repos):"
+            msg="$msg gh secret set AUTOMATION_APP_ID -R $REPO; gh secret set AUTOMATION_APP_KEY -R $REPO < key.pem"
+            echo "::error::$msg"
+            exit 1
+          fi
+
+      - name: Token of the automation App (this repo only)
+        id: app
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ secrets.AUTOMATION_APP_ID }}
+          private-key: ${{ secrets.AUTOMATION_APP_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-workflows: write
+
+      - name: Check out the repo with all branches
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: repo
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check out the shared automation
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ inputs.workflows-repo }}
+          ref: ${{ inputs.workflows-ref }}
+          path: wf
+          persist-credentials: false
+
+      - name: Sync dev
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          REPO: ${{ github.repository }}
+        run: python3 wf/scripts/tm.py sync-dev --repo "$REPO" --sha "$GITHUB_SHA" --git-dir repo

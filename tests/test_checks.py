@@ -125,6 +125,7 @@ def test_report_in_actions(capsys, monkeypatch, tmp_path):
     assert "::warning title=format::branch `x` is bad%0Areally" in out
     assert "::warning title=format::100%25 wrong" in out
     assert "never blocking" in summary.read_text()
+    assert "doctor --fix" in summary.read_text()
 
 
 def test_check_format_cli_never_fails(repo, tmp_path):

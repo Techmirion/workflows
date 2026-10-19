@@ -1,4 +1,4 @@
-"""Decisions of the `release-pr` and `release` workflows (git.md 9 and 14).
+"""Decisions of the `release-pr`, `release` and `sync-dev` workflows (git.md 9 and 14).
 
 Pure functions over facts that the caller gathers (git ancestry, tags, PRs), so
 every rule can be tested without git or GitHub.
@@ -227,15 +227,30 @@ def plan_release(*, sha: str, prs: list[dict], tags: list[str], tags_at_sha: lis
         actions.append(("release", tag, name, release_notes(pr, kind)))
     if move_major_tag:
         actions.append(("move-tag", f"v{version[0]}", sha))
-    if sha_is_ancestor_of_dev:
-        pass  # dev already contains main
-    elif dev_is_ancestor_of_sha:
-        actions.append(("fast-forward-dev", sha))
-    elif open_sync_prs:
-        warnings.append("dev has moved; a sync PR is already open: " + ", ".join(f"#{p['number']}" for p in open_sync_prs))
-    else:
-        actions.append(("sync-pr", SYNC_TITLE, sync_body(tag, pr)))
+    sync_actions, sync_warnings = plan_sync(
+        sha=sha, sha_is_ancestor_of_dev=sha_is_ancestor_of_dev, dev_is_ancestor_of_sha=dev_is_ancestor_of_sha,
+        open_sync_prs=open_sync_prs, body=sync_body(tag, pr))
+    actions += sync_actions
+    warnings += sync_warnings
     return {"kind": kind, "version": tag, "pr": pr["number"], "actions": actions, "warnings": warnings}
+
+
+def plan_sync(*, sha: str, sha_is_ancestor_of_dev: bool, dev_is_ancestor_of_sha: bool,
+              open_sync_prs: list[dict], body: str, dev_exists: bool = True) -> tuple[list, list[str]]:
+    """Bring `main` (at `sha`) back into `dev`. Used by `release` and by `sync-dev`.
+
+    Returns (actions, warnings); actions are ("fast-forward-dev", sha) or
+    ("sync-pr", title, body), or none when dev already contains main.
+    """
+    if not dev_exists:
+        return [], ["there is no `dev` branch: nothing to sync"]
+    if sha_is_ancestor_of_dev:
+        return [], []  # dev already contains main
+    if dev_is_ancestor_of_sha:
+        return [("fast-forward-dev", sha)], []
+    if open_sync_prs:
+        return [], ["dev has moved; a sync PR is already open: " + ", ".join(f"#{p['number']}" for p in open_sync_prs)]
+    return [("sync-pr", SYNC_TITLE, body)], []
 
 
 def sync_body(tag: str, pr: dict) -> str:
@@ -244,6 +259,16 @@ def sync_body(tag: str, pr: dict) -> str:
         "the release was being merged.\n\nMerge it with a merge commit like any other PR "
         "(git.md 9). Until it is merged, `release-pr` refuses to start the next release.\n\n"
         "- [x] No issue needed\n"
+    )
+
+
+def sync_dev_body(sha: str, pr: dict | None) -> str:
+    """Body of the sync PR opened by `sync-dev` (a push to main outside the release flow)."""
+    what = f"PR #{pr['number']}" if pr else "a push without a pull request"
+    return (
+        f"Brings `main` ({sha[:7]}, {what}) back into `dev`, because `dev` has commits that `main` "
+        "does not have, so it cannot simply be fast-forwarded.\n\nMerge it with a merge commit like any "
+        "other PR (git.md 9).\n\n- [x] No issue needed\n"
     )
 
 

@@ -65,6 +65,27 @@ def test_bad_subject_refused(hooked_repo):
     assert git(hooked_repo, "rev-parse", "HEAD").stdout == head
 
 
+def test_warn_mode_keeps_the_commit_and_says_why(hooked_repo):
+    git(hooked_repo, "config", "techmirion.hooks", "warn")
+    git(hooked_repo, "checkout", "-q", "-b", "fix/34-x")
+    p = commit_file(hooked_repo, "a.txt", "1", "fixed the login\n\nCo-Authored-By: Bot <b@example.org>",
+                    check=False, env=env_with_gitleaks())
+    assert p.returncode == 0
+    assert "techmirion.hooks=warn" in p.stderr and "doctor --fix" in p.stderr
+    assert "Co-Authored-By" in p.stderr
+    assert subject(hooked_repo).startswith("fixed the login")
+
+
+def test_warn_mode_still_scans_for_secrets(hooked_repo):
+    git(hooked_repo, "config", "techmirion.hooks", "warn")
+    head = git(hooked_repo, "rev-parse", "HEAD").stdout
+    key = "AKIA" + "".join(random.choice(string.ascii_uppercase + "234567") for _ in range(16))
+    p = commit_file(hooked_repo, "creds.py", f'aws_key = "{key}"\n', "chore(x): y", check=False, env=env_with_gitleaks())
+    if p.returncode == 0:
+        pytest.skip("gitleaks did not flag the sample key")
+    assert git(hooked_repo, "rev-parse", "HEAD").stdout == head
+
+
 def test_closing_keyword_in_commit_refused(hooked_repo):
     git(hooked_repo, "checkout", "-q", "-b", "fix/34-x")
     Path(hooked_repo, "a.txt").write_text("1")

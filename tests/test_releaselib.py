@@ -153,6 +153,37 @@ def test_release_opens_sync_pr_when_dev_moved():
     assert plan["actions"][2][1] == "chore(release): sync main into dev"
 
 
+def sync(**kw):
+    args = dict(sha=M2, sha_is_ancestor_of_dev=False, dev_is_ancestor_of_sha=True, open_sync_prs=[], body="b")
+    args.update(kw)
+    return rl.plan_sync(**args)
+
+
+def test_plan_sync_fast_forwards_when_dev_is_behind():
+    assert sync() == ([("fast-forward-dev", M2)], [])
+
+
+def test_plan_sync_does_nothing_when_dev_contains_main():
+    assert sync(sha_is_ancestor_of_dev=True) == ([], [])
+
+
+def test_plan_sync_opens_one_sync_pr_when_dev_moved():
+    assert sync(dev_is_ancestor_of_sha=False) == ([("sync-pr", "chore(release): sync main into dev", "b")], [])
+    actions, warnings = sync(dev_is_ancestor_of_sha=False, open_sync_prs=[{"number": 31}])
+    assert actions == [] and "already open: #31" in warnings[0]
+
+
+def test_plan_sync_without_dev():
+    actions, warnings = sync(dev_exists=False)
+    assert actions == [] and "no `dev` branch" in warnings[0]
+
+
+def test_sync_dev_body_passes_the_body_check():
+    from tmflow import fmt
+    assert fmt.check_body(rl.sync_dev_body(M2, {"number": 7})) == []
+    assert "a push without a pull request" in rl.sync_dev_body(M2, None)
+
+
 def test_existing_sync_pr_is_not_duplicated():
     plan = plan_rel([merged_pr(30, "dev", "Version: v1.3.0")], dev_is_ancestor_of_sha=False,
                     open_sync_prs=[{"number": 31}])
