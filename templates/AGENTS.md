@@ -17,6 +17,10 @@ Owner and deputy: [`.github/CODEOWNERS`](.github/CODEOWNERS).
 - `PLAN.md`, if there is one: the plan, and the decisions (D1, D2, …) with their reasons.
 - The handbook: `git.md` (the flow), `testing.md`, `ai-guardrails.md`, and `web.md` for a
   web interface.
+- Agents: the team skill `techmirion-standards` (on the boxes:
+  `/shared/skills/skills/techmirion-standards/SKILL.md`). Run its doctor before every push
+  and fix what it reports (`ai-guardrails.md` section 8). No `Co-Authored-By:` or other
+  assistant lines in commits.
 
 ## Commands
 
