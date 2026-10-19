@@ -50,6 +50,8 @@ TEMPLATE_FILES = [
     ".github/CODEOWNERS",
     ".github/dependabot.yml",
     ".pre-commit-config.yaml",
+    "AGENTS.md",
+    "CLAUDE.md",
 ]
 
 
@@ -129,7 +131,7 @@ def plan(repo: str, *, visibility: str = "private", clone: str | None = None, ow
         steps.append({"kind": "manual", "what": f"repo secret: gh secret set AUTOMATION_APP_KEY --repo {repo} < /path/to/automation-app.pem"})
     if clone:
         steps.append({"kind": "files", "what": f"files of git.md 13 from templates/ into {clone} (existing files are kept)",
-                      "clone": clone, "owner": owner, "deputy": deputy})
+                      "clone": clone, "owner": owner, "deputy": deputy, "repo": repo})
         if hooks == "plain":
             steps.append({"kind": "local", "what": "git hooks (plain, no network)",
                           "argv": ["sh", str(ROOT / "scripts" / "install-hooks.sh"), clone]})
@@ -143,6 +145,14 @@ def template_targets(clone: str) -> list[tuple[Path, Path]]:
     return [(TEMPLATES / rel, Path(clone) / rel) for rel in TEMPLATE_FILES]
 
 
+def skip_reason(dst: Path) -> str | None:
+    """Why a template is not copied although its target is missing, or None."""
+    if dst.name == "AGENTS.md" and (dst.parent / "CLAUDE.md").exists():
+        # pi reads AGENTS.md before CLAUDE.md: an empty stub would hide the notes the repo has.
+        return "the repo has a CLAUDE.md: move its notes into AGENTS.md and leave `@AGENTS.md` in CLAUDE.md"
+    return None
+
+
 def merge_gitignore(existing: str, template: str) -> str:
     """Append the template's lines that `existing` lacks. Never removes an entry."""
     have = {ln.strip() for ln in existing.splitlines()}
@@ -153,8 +163,11 @@ def merge_gitignore(existing: str, template: str) -> str:
     return out + "\n# git.md section 11 (added by repo-init)\n" + "\n".join(missing) + "\n"
 
 
-def render_template(src: Path, owner: str | None, deputy: str | None) -> str:
+def render_template(src: Path, owner: str | None, deputy: str | None, repo: str | None = None) -> str:
     text = src.read_text(encoding="utf-8")
+    if src.name == "AGENTS.md" and repo:
+        # The title line is `# REPO`: the repo's name without the org.
+        text = text.replace("# REPO\n", f"# {repo.split('/')[-1]}\n", 1)
     if src.name == "CODEOWNERS":
         text = text.replace("@OWNER", f"@{owner}" if owner else "@OWNER")
         text = text.replace("@DEPUTY", f"@{deputy}" if deputy else "@DEPUTY")
@@ -182,7 +195,8 @@ def describe(steps: list[dict], repo: str = "REPO") -> str:
             out.append(f"gh api -X PUT user/installations/{s['installation']}/repositories/<repo id>")
         elif s["kind"] == "files":
             for src, dst in template_targets(s["clone"]):
-                out.append(f"{'keep' if dst.exists() else 'copy'} {dst}")
+                why = None if dst.exists() else skip_reason(dst)
+                out.append(f"skip {dst}  ({why})" if why else f"{'keep' if dst.exists() else 'copy'} {dst}")
             out.append(f"merge missing git.md 11 entries into {Path(s['clone']) / '.gitignore'}")
         elif s["kind"] == "manual":
             out.append("# (by hand)")
@@ -228,8 +242,12 @@ def apply(repo: str, steps: list[dict]) -> None:  # pragma: no cover - needs Git
                 if dst.exists():
                     print(f"   keep {dst}")
                     continue
+                why = skip_reason(dst)
+                if why:
+                    print(f"   skip {dst}: {why}")
+                    continue
                 dst.parent.mkdir(parents=True, exist_ok=True)
-                dst.write_text(render_template(src, s.get("owner"), s.get("deputy")), encoding="utf-8")
+                dst.write_text(render_template(src, s.get("owner"), s.get("deputy"), s.get("repo")), encoding="utf-8")
                 shutil.copymode(src, dst)
                 print(f"   wrote {dst}")
             gi = Path(s["clone"]) / ".gitignore"
