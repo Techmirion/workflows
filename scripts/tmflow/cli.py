@@ -334,8 +334,14 @@ def cmd_repo_init(a):
 
 
 def main(argv=None) -> int:
+    argv = sys.argv[1:] if argv is None else list(argv)
+    if argv[:1] == ["doctor"]:  # its own parser, so the skill's standalone copy behaves the same
+        from . import doctor
+        return doctor.main(argv[1:])
     p = argparse.ArgumentParser(prog="tm.py", description=__doc__)
     sub = p.add_subparsers(dest="cmd", required=True)
+    sub.add_parser("doctor", add_help=False,
+                   help="check this clone against the team rules and fix the safe things (tm.py doctor --help)")
 
     def forge_args(sp):
         sp.add_argument("--repo", required=True, help="owner/name")

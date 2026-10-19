@@ -15,6 +15,7 @@ What is here:
 | `.pre-commit-hooks.yaml` | the same hooks, for `pre-commit` |
 | `labels.json` | the one label set (section 13), plus `wip` (section 6) |
 | `scripts/tm.py` + `scripts/tmflow/` | all the logic, Python standard library only; the workflows only call it |
+| `scripts/tmflow/doctor.py` | `tm.py doctor`: checks a clone before a commit, push or PR and fixes the safe things (below) |
 | `scripts/install-hooks.sh` | installs the hooks as plain git hooks, no network |
 | `scripts/install-gitleaks.sh` | installs the gitleaks binary (checksum-verified) into `~/.local/bin` |
 | `tests/` | pytest for all of it |
@@ -61,6 +62,36 @@ Format rules (`scripts/tmflow/fmt.py`):
 - no commit carries a `Co-Authored-By:` trailer, merges, reverts and bots included: the `commit-msg` hook refuses it and `checks` fails on it (`tm.py check-trailers`, also usable locally: `python3 scripts/tm.py check-trailers origin/dev..HEAD`);
 - PR body: a line `Fixes #N` or `Refs #N`, or `- [x] No issue needed`.
 
+## Doctor: check and fix before you push
+
+`tm.py doctor` looks at a clone the way the checks will: the branch name, the
+commits that are not on `dev` yet (format, `(#N)`, `Co-Authored-By:`, assistant
+lines, `Fixes` in commits, the author), staged or committed secrets and
+generated files, the hooks, and the open PR (title, body, base). It never
+blocks: the exit code is 0 unless `--strict`.
+
+```sh
+python3 scripts/tm.py doctor /path/to/clone            # report
+python3 scripts/tm.py doctor /path/to/clone --fix      # and fix the safe things
+python3 scripts/tm.py doctor /path/to/clone --fix-pr   # and the PR title and base on GitHub
+python3 scripts/tm.py doctor --json                    # for agents
+```
+
+`--fix` only ever: rewords commits that are **not on any remote** (drops
+`Co-Authored-By:` and assistant lines and `Fixes #N` body lines, adds `(#N)` from
+the branch; trees, authors and dates unchanged; it prints the old tip for undo),
+renames a branch that is not on any remote when lowercasing makes it valid, and
+unstages secret-like or generated files (never deletes them). Everything else it
+reports with the command to run. Pushed history is never rewritten.
+
+The profile follows `origin`: **flow** (a Techmirion repo whose `checks.yml`
+calls this repo), **team** (a Techmirion repo off the flow: format findings are
+notes), **live** (a `/shared/hub` repo: `#N` is a hub task and `closes #N` is
+allowed, no PRs), **other** (only secrets, generated files and trailers).
+
+`doctor.py` needs only `fmt.py`, so the team skill `techmirion-standards`
+(`/shared/skills`) carries a copy: that is how every agent on the boxes runs it.
+
 ## Hooks
 
 Plain git hooks, no network (what to use until the remote exists):
@@ -69,6 +100,11 @@ Plain git hooks, no network (what to use until the remote exists):
 sh scripts/install-gitleaks.sh            # once per machine, into ~/.local/bin
 sh scripts/install-hooks.sh /path/to/clone
 ```
+
+Hooks refuse a bad commit message by default. `git config techmirion.hooks warn`
+in a clone turns that into a warning: the commit is kept, and `tm.py doctor
+--fix` cleans it up before the push. The gitleaks hook still refuses a secret,
+and CI still fails on `Co-Authored-By:`.
 
 Or through pre-commit, once this repo is on GitHub (`templates/.pre-commit-config.yaml`):
 

@@ -137,6 +137,11 @@ def scan_range(event_name: str, event: dict) -> str | None:
     return None
 
 
+#: Where a warning sends people and agents (ai-guardrails.md 8).
+FIX_HINT = ("Fix locally, in your clone: `python3 <workflows clone>/scripts/tm.py doctor --fix`, or ask an agent "
+            "that has the team skill `techmirion-standards`. Pushed commits are left as they are.")
+
+
 def report(problems: list[str], *, title: str = "format") -> None:
     gha = os.environ.get("GITHUB_ACTIONS") == "true"
     for p in problems:
@@ -150,6 +155,10 @@ def report(problems: list[str], *, title: str = "format") -> None:
         with open(summary, "a", encoding="utf-8") as f:
             f.write("### Format checks (warnings, never blocking)\n\n")
             f.write("".join(f"- {p}\n" for p in problems) if problems else "All format checks passed.\n")
+            if problems:
+                f.write(f"\n{FIX_HINT}\n")
             f.write("\n")
     if not problems:
         print("format checks: all passed")
+    else:
+        print(FIX_HINT)
