@@ -39,8 +39,8 @@ from tmflow import fmt  # noqa: E402
 LEVELS = ("error", "warn", "info")
 PROFILES = ("flow", "team", "live", "other")
 
-#: Lines that name the agent that did the work. Nothing in git names it: not a commit, not a
-#: PR (git.md 5, ai-guardrails.md 3).
+#: Lines that name an outside agent that did the work (git.md 5, ai-guardrails.md 3); our own
+#: agents are let through by `fmt.agent_lines`.
 ASSISTANT_RE = fmt.AGENT_LINE_RE
 
 
@@ -179,7 +179,7 @@ def fixed_message(msg: str, *, issue: int | None, add_ref: bool, drop_closing: b
     """The message with the safe fixes applied. The subject's wording is never changed."""
     out, subject_seen = [], False
     for line in msg.split("\n"):
-        if fmt.COAUTHOR_RE.fullmatch(line) or ASSISTANT_RE.fullmatch(line):
+        if fmt.COAUTHOR_RE.fullmatch(line) or fmt.agent_lines(line):
             continue
         if not subject_seen and line.strip():
             subject_seen = True
@@ -318,7 +318,7 @@ def diagnose(cwd: str, *, base_arg=None, profile_arg=None, check_pr=True) -> Sta
             why = "CI fails on it" if s.profile == "flow" else "commits never carry one"
             F(finding("C3", "error", f"`{c.subject}` has a Co-Authored-By trailer: {why} (git.md 5){where}",
                       commit=c.short, fix="remove the trailer" if not pushed else "tell the person", auto=auto))
-        if ASSISTANT_RE.search(msg):
+        if fmt.agent_lines(msg):
             why = "CI fails on it" if s.profile == "flow" else "nothing in git names the agent"
             F(finding("C6", "error", f"`{c.subject}` names the agent that did the work (Claude-Session, Generated with …): "
                       f"{why} (git.md 5){where}", commit=c.short,
@@ -344,7 +344,7 @@ def diagnose(cwd: str, *, base_arg=None, profile_arg=None, check_pr=True) -> Sta
                       fix=None if body_only else "reword the subject without the keyword",
                       auto=auto if body_only else None))
         body = [x for x in fmt.message_lines(msg, "")[1:] if x.strip()
-                and not fmt.COAUTHOR_RE.fullmatch(x) and not ASSISTANT_RE.fullmatch(x) and not CLOSING_LINE_RE.fullmatch(x)]
+                and not fmt.COAUTHOR_RE.fullmatch(x) and not fmt.agent_lines(x) and not CLOSING_LINE_RE.fullmatch(x)]
         if body and s.profile in ("flow", "team"):
             F(finding("C5", "info", f"`{c.subject}` has a body: commits are one line (git.md 5); the why goes in the PR",
                       commit=c.short))

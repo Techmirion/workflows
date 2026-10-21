@@ -19,8 +19,8 @@ Owner and deputy: [`.github/CODEOWNERS`](.github/CODEOWNERS).
   web interface.
 - Agents: the team skill `techmirion-standards` (on the boxes:
   `/shared/skills/skills/techmirion-standards/SKILL.md`). Run its doctor before every push
-  and fix what it reports (`ai-guardrails.md` section 8). Nothing in git names the agent
-  that did the work: no `Co-Authored-By:`, `Claude-Session:` or "Generated with …" in a
+  and fix what it reports (`ai-guardrails.md` section 8). Nothing in git names an outside
+  agent that did the work (our own Omicron, Ypsilon and Omega may be named): no `Co-Authored-By:`, `Claude-Session:` or "Generated with …" in a
   commit, and no agent line in a PR title, body or merge (`git.md` section 5).
 
 ## Commands

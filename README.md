@@ -60,7 +60,7 @@ Format rules (`scripts/tmflow/fmt.py`):
 - branch `type/N-topic` or `type/topic`, type one of `feat fix chore docs refactor test hotfix`; exempt `dev`, `main`, `dependabot/*`;
 - commit subject and PR title `type(place): message`, optional `(#N)`, `(#N, #M)`, `(Owner/repo#N)` at the end; PR titles may also be `release: vX.Y.Z <summary>`; exempt merges, reverts, Dependabot and the sync PR;
 - no commit carries a `Co-Authored-By:` trailer, merges, reverts and bots included: the `commit-msg` hook refuses it and `checks` fails on it (`tm.py check-trailers`, also usable locally: `python3 scripts/tm.py check-trailers origin/dev..HEAD`);
-- nothing in git names the agent that did the work: no `Claude-Session:` line, no "Generated with [Claude Code]" (or Omicron, pi, Codex, Copilot …), no ticked "An AI assistant did part of this work" box, in a commit, a merge, a PR title or a PR body. The hook refuses it in commits and `check-trailers` fails on it, commits and PR alike;
+- nothing in git names an outside agent that did the work: no `Claude-Session:` line, no "Generated with [Claude Code]" (or pi, Codex, Copilot …), no ticked "An AI assistant did part of this work" box, in a commit, a merge, a PR title or a PR body. The hook refuses it in commits and `check-trailers` fails on it, commits and PR alike. Our own agents, Omicron, Ypsilon and Omega (`fmt.OUR_AGENTS`), may be named; a `Co-Authored-By:` trailer is refused for them too;
 - PR body: a line `Fixes #N` or `Refs #N`, or `- [x] No issue needed`.
 
 ## Doctor: check and fix before you push
