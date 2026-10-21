@@ -76,6 +76,7 @@ COAUTHOR_RE = re.compile(r"^[ \t]*co-authored-by[ \t]*:.*$", re.I | re.M)
 AGENT_LINE_RE = re.compile(
     r"^[ \t]*(?:"
     r"claude-session[ \t]*:.*"
+    r"|<?https?://claude\.ai/code/session_\S*"
     r"|(?:🤖[ \t]*)?(?:generated|written|created|made) (?:with|by|using) \[?"
     r"(?:claude|omicron|pi|codex|copilot|chatgpt|cursor|gemini|aider)\b.*"
     r"|[-*][ \t]+\[[xX]\][ \t]+an ai assistant did part of this work\b.*"
