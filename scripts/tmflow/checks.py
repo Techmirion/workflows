@@ -1,8 +1,9 @@
 """The format checks of the `checks` workflow (git.md 14), from a GitHub event.
 
 Every format problem is a warning: the free plan cannot make a format rule
-blocking, so the owner holds the line (git.md 6). The one exception is the
-`Co-Authored-By:` trailer (git.md 5): `trailer_problems` fails the job.
+blocking, so the owner holds the line (git.md 6). The one exception is a
+`Co-Authored-By:` trailer or a line that names the agent, in a commit, a PR title
+or a PR body (git.md 5): `event_trailer_problems` fails the job.
 """
 from __future__ import annotations
 
@@ -94,23 +95,33 @@ def push_problems(event: dict, cwd: str | None = None) -> list[str]:
 
 
 def trailer_problems(rng: str, cwd: str | None = None) -> list[str]:
-    """Commits in a range that carry a `Co-Authored-By:` trailer. Every commit counts:
-    merges, reverts and Dependabot too, so a merge cannot bring one in either."""
+    """Commits in a range that carry a `Co-Authored-By:` trailer or a line that names the
+    agent. Every commit counts: merges, reverts and Dependabot too, so a merge cannot bring
+    one in either."""
     problems = []
     for c in gitutil.commits(rng, cwd=cwd):
-        for p in fmt.check_no_coauthor(c["subject"] + "\n" + c.get("body", "")):
+        msg = c["subject"] + "\n" + c.get("body", "")
+        for p in fmt.check_no_coauthor(msg) + fmt.check_no_agent(msg):
             problems.append(f"commit {c['sha'][:7]}: {p}")
     return problems
 
 
+def pr_agent_problems(pr: dict) -> list[str]:
+    """A PR title or body that names the agent that did the work (git.md 5, 6)."""
+    return (fmt.check_no_agent(pr.get("title") or "", what="the PR title")
+            + fmt.check_no_agent(pr.get("body") or "", what="the PR body"))
+
+
 def event_trailer_problems(event_name: str, event: dict, cwd: str | None = None) -> list[str]:
-    """`trailer_problems` over the commits of a PR or a push. Fails closed: commits that
-    cannot be read are a problem too."""
+    """`trailer_problems` over the commits of a PR or a push, and `pr_agent_problems` over
+    the PR's title and body. Fails closed: commits that cannot be read are a problem too."""
+    pre: list[str] = []
     if event_name in ("pull_request", "pull_request_target") and "pull_request" in event:
         pr = event["pull_request"]
+        pre = pr_agent_problems(pr)
         base_sha, head_sha = pr["base"].get("sha"), pr["head"].get("sha")
         if not base_sha or not head_sha:
-            return ["the event has no base or head commit: the trailers could not be checked"]
+            return pre + ["the event has no base or head commit: the trailers could not be checked"]
         rng = f"{base_sha}..{head_sha}"
     elif event_name == "push":
         after = event.get("after")
@@ -122,9 +133,9 @@ def event_trailer_problems(event_name: str, event: dict, cwd: str | None = None)
     else:
         return []
     try:
-        return trailer_problems(rng, cwd=cwd)
+        return pre + trailer_problems(rng, cwd=cwd)
     except gitutil.GitError as e:
-        return [f"could not read the commits {rng}: {e}"]
+        return pre + [f"could not read the commits {rng}: {e}"]
 
 
 def scan_range(event_name: str, event: dict) -> str | None:

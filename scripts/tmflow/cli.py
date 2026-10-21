@@ -93,7 +93,8 @@ def cmd_check_format(a):
 
 
 def cmd_check_trailers(a):
-    """Fails on a `Co-Authored-By:` trailer (git.md 5): blocking, unlike the format checks."""
+    """Fails on a `Co-Authored-By:` trailer or a line that names the agent (git.md 5): blocking,
+    unlike the format checks."""
     try:
         if a.range:
             problems = checks.trailer_problems(a.range, cwd=a.git_dir)
@@ -111,7 +112,7 @@ def cmd_check_trailers(a):
         else:
             print(f"error: {p}")
     if not problems:
-        print("trailers: no Co-Authored-By")
+        print("trailers: no Co-Authored-By, no agent named")
     return 1 if problems else 0
 
 
@@ -378,7 +379,7 @@ def main(argv=None) -> int:
     sp.add_argument("--git-dir", default=".")
     sp.set_defaults(fn=cmd_check_format)
 
-    sp = sub.add_parser("check-trailers", help="refuse Co-Authored-By trailers in a range or a GitHub event (blocking)")
+    sp = sub.add_parser("check-trailers", help="refuse Co-Authored-By trailers and lines naming the agent in a range or a GitHub event (blocking)")
     sp.add_argument("range", nargs="?", help="a git range such as origin/dev..HEAD")
     sp.add_argument("--event")
     sp.add_argument("--event-name")

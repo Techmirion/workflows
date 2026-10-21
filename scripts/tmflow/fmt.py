@@ -71,6 +71,17 @@ CLOSING_RE = re.compile(
 HTML_COMMENT_RE = re.compile(r"<!--.*?-->", re.S)
 #: A `Co-Authored-By:` trailer, in any case. Commits never carry one (git.md 5).
 COAUTHOR_RE = re.compile(r"^[ \t]*co-authored-by[ \t]*:.*$", re.I | re.M)
+#: A line that names the agent that did the work: an assistant's sign-off or session link, or
+#: the old PR checklist box, ticked. Nothing in git names the agent (git.md 5, ai-guardrails.md 3).
+AGENT_LINE_RE = re.compile(
+    r"^[ \t]*(?:"
+    r"claude-session[ \t]*:.*"
+    r"|(?:🤖[ \t]*)?(?:generated|written|created|made) (?:with|by|using) \[?"
+    r"(?:claude|omicron|pi|codex|copilot|chatgpt|cursor|gemini|aider)\b.*"
+    r"|[-*][ \t]+\[[xX]\][ \t]+an ai assistant did part of this work\b.*"
+    r")$",
+    re.I | re.M,
+)
 
 VERSION_RE = re.compile(r"^v?(?P<major>0|[1-9][0-9]*)\.(?P<minor>0|[1-9][0-9]*)\.(?P<patch>0|[1-9][0-9]*)$")
 #: Release tags. Exactly `vMAJOR.MINOR.PATCH`; the moving `v1` of the workflows repo is not one.
@@ -240,6 +251,19 @@ def check_no_coauthor(text: str) -> list[str]:
     if not coauthor_lines(text):
         return []
     return ["the message has a `Co-Authored-By:` trailer: commits never carry one (git.md 5), remove the line"]
+
+
+def agent_lines(text: str) -> list[str]:
+    """Every line that names the agent that did the work (`AGENT_LINE_RE`), stripped, in order."""
+    return [m.group(0).strip() for m in AGENT_LINE_RE.finditer(strip_comments(text))]
+
+
+def check_no_agent(text: str, *, what: str = "the message") -> list[str]:
+    """Refuse a line that names the agent (git.md 5): commits, merges, PR titles and bodies alike."""
+    lines = agent_lines(text)
+    if not lines:
+        return []
+    return [f"{what} names the agent that did the work (`{lines[0][:60]}`): nothing in git does (git.md 5), remove the line"]
 
 
 # --- PR bodies --------------------------------------------------------------
