@@ -6,7 +6,8 @@
   reference (the case where the subject was written in the editor).
 - Refuses a subject that does not match the format, and a message that uses a
   closing keyword (`Fixes #N`): a commit does not finish an issue, the release does.
-- Refuses a `Co-Authored-By:` trailer, in every commit: merges and reverts too.
+- Refuses a `Co-Authored-By:` trailer, and any line that names the agent that did
+  the work (`Claude-Session:`, "Generated with …"), in every commit: merges and reverts too.
 - `git config techmirion.hooks warn` turns every refusal into a warning: the
   commit is kept and `tm.py doctor --fix` (or the team skill) fixes it before the push.
 - Exempt from the format: merge and revert commits. fixup!/squash! commits pass
@@ -46,7 +47,7 @@ def refuse(problems, show_format):
             "  example: fix(auth): redirect after login (#34)\n"
         )
     if warn_only:
-        sys.stderr.write("  fix it before you push: `tm.py doctor --fix` rewords unpushed commits; CI still fails on Co-Authored-By\n")
+        sys.stderr.write("  fix it before you push: `tm.py doctor --fix` rewords unpushed commits; CI still fails on Co-Authored-By and agent lines\n")
         return 0
     sys.stderr.write(
         "  your message is kept in .git/COMMIT_EDITMSG; edit it with: git commit -e -F .git/COMMIT_EDITMSG\n"
@@ -62,7 +63,8 @@ def main(argv):
     cc = comment_char()
     with open(path, encoding="utf-8") as f:
         text = f.read()
-    coauthor = fmt.check_no_coauthor("\n".join(fmt.message_lines(text, cc)))
+    msg = "\n".join(fmt.message_lines(text, cc))
+    coauthor = fmt.check_no_coauthor(msg) + fmt.check_no_agent(msg)
     if os.path.exists(os.path.join(gd, "MERGE_HEAD")):
         return refuse(coauthor, show_format=False) if coauthor else 0
     subject = fmt.subject_of(text, cc)

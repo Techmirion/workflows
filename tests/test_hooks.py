@@ -228,6 +228,17 @@ def test_coauthor_trailer_refused(hooked_repo):
     assert git(hooked_repo, "rev-parse", "HEAD").stdout == head
 
 
+def test_agent_line_refused(hooked_repo):
+    env = env_with_gitleaks()
+    git(hooked_repo, "checkout", "-q", "-b", "chore/x")
+    Path(hooked_repo, "a.txt").write_text("1")
+    git(hooked_repo, "add", "a.txt")
+    p = git(hooked_repo, "commit", "-q", "-m", "chore(x): fine subject", "-m",
+            "Claude-Session: https://claude.ai/code/session_x", check=False, env=env)
+    assert p.returncode != 0
+    assert "names the agent" in p.stderr
+
+
 def test_coauthor_trailer_refused_on_a_merge(hooked_repo):
     env = env_with_gitleaks()
     git(hooked_repo, "checkout", "-q", "-b", "dev")

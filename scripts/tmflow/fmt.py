@@ -71,6 +71,24 @@ CLOSING_RE = re.compile(
 HTML_COMMENT_RE = re.compile(r"<!--.*?-->", re.S)
 #: A `Co-Authored-By:` trailer, in any case. Commits never carry one (git.md 5).
 COAUTHOR_RE = re.compile(r"^[ \t]*co-authored-by[ \t]*:.*$", re.I | re.M)
+#: A line that names an outside agent that did the work: an assistant's sign-off or session
+#: link, or the old PR checklist box, ticked. Nothing in git names one (git.md 5,
+#: ai-guardrails.md 3). Our own agents (`OUR_AGENTS`) are the exception.
+AGENT_LINE_RE = re.compile(
+    r"^[ \t]*(?:"
+    r"claude-session[ \t]*:.*"
+    r"|<?https?://claude\.ai/code/session_\S*"
+    r"|(?:🤖[ \t]*)?(?:generated|written|created|made) (?:with|by|using) \[?"
+    r"(?:claude|pi|codex|copilot|chatgpt|cursor|gemini|aider)\b.*"
+    r"|[-*][ \t]+\[[xX]\][ \t]+an ai assistant did part of this work\b.*"
+    r")$",
+    re.I | re.M,
+)
+#: Our own agents: they may be named in git (git.md 5). A `Co-Authored-By:` trailer is still refused.
+OUR_AGENTS = ("Omicron", "Ypsilon", "Omega")
+OUR_AGENTS_RE = re.compile(r"\b(?:" + "|".join(OUR_AGENTS) + r")\b", re.I)
+#: Outside assistants: a line that names one of these is never one of ours.
+OUTSIDE_AGENT_RE = re.compile(r"\b(?:claude|pi|codex|copilot|chatgpt|cursor|gemini|aider)\b", re.I)
 
 VERSION_RE = re.compile(r"^v?(?P<major>0|[1-9][0-9]*)\.(?P<minor>0|[1-9][0-9]*)\.(?P<patch>0|[1-9][0-9]*)$")
 #: Release tags. Exactly `vMAJOR.MINOR.PATCH`; the moving `v1` of the workflows repo is not one.
@@ -240,6 +258,27 @@ def check_no_coauthor(text: str) -> list[str]:
     if not coauthor_lines(text):
         return []
     return ["the message has a `Co-Authored-By:` trailer: commits never carry one (git.md 5), remove the line"]
+
+
+def agent_lines(text: str) -> list[str]:
+    """Every line that names an outside agent that did the work (`AGENT_LINE_RE`), stripped, in
+    order. A line that names only our own agents (`OUR_AGENTS`) is not one."""
+    out = []
+    for m in AGENT_LINE_RE.finditer(strip_comments(text)):
+        line = m.group(0).strip()
+        if OUR_AGENTS_RE.search(line) and not OUTSIDE_AGENT_RE.search(line):
+            continue
+        out.append(line)
+    return out
+
+
+def check_no_agent(text: str, *, what: str = "the message") -> list[str]:
+    """Refuse a line that names an outside agent (git.md 5): commits, merges, PR titles and bodies
+    alike. Our own agents (`OUR_AGENTS`) may be named."""
+    lines = agent_lines(text)
+    if not lines:
+        return []
+    return [f"{what} names the agent that did the work (`{lines[0][:60]}`): nothing in git does (git.md 5), remove the line"]
 
 
 # --- PR bodies --------------------------------------------------------------

@@ -12,7 +12,7 @@ and 11; ai-guardrails.md 8). It never blocks: the exit code is 0 unless
 
 What --fix may change, and nothing else:
 - the messages of commits that are not on any remote yet: drops `Co-Authored-By:`
-  and assistant lines, drops `Fixes #N` lines from the body, adds `(#N)` from the
+  and lines that name the agent, drops `Fixes #N` lines from the body, adds `(#N)` from the
   branch name. Trees, authors and dates stay as they were; the old tip is printed
   for undo. Pushed commits are never rewritten.
 - the name of a branch that is not on any remote, when lowercasing it makes it valid;
@@ -39,12 +39,16 @@ from tmflow import fmt  # noqa: E402
 LEVELS = ("error", "warn", "info")
 PROFILES = ("flow", "team", "live", "other")
 
-#: Lines an assistant adds to a commit message. Work done with an assistant is said in the
-#: PR, not in the commit (git.md 5, ai-guardrails.md 3).
-ASSISTANT_RE = re.compile(
-    r"^[ \t]*(?:claude-session[ \t]*:.*|(?:🤖[ \t]*)?generated (?:with|by) \[?(?:claude|omicron|pi)\b.*)$",
-    re.I | re.M,
-)
+#: Lines that name an outside agent that did the work (git.md 5, ai-guardrails.md 3); our own
+#: agents are let through by `fmt.agent_lines`.
+ASSISTANT_RE = fmt.AGENT_LINE_RE
+
+
+def checks_pr_agent(pr: dict) -> list[str]:
+    """The PR title or body names the agent (git.md 6). The same check as `checks.pr_agent_problems`,
+    kept here because the doctor needs only fmt.py."""
+    return (fmt.check_no_agent(pr.get("title") or "", what="the PR title")
+            + fmt.check_no_agent(pr.get("body") or "", what="the PR body"))
 #: A body line that only closes issues: `Fixes #34`, `closes #34, #40`.
 CLOSING_LINE_RE = re.compile(
     rf"^[ \t]*(?:[-*][ \t]+)?(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)[ \t]*:?[ \t]+{fmt.REF}"
@@ -175,7 +179,7 @@ def fixed_message(msg: str, *, issue: int | None, add_ref: bool, drop_closing: b
     """The message with the safe fixes applied. The subject's wording is never changed."""
     out, subject_seen = [], False
     for line in msg.split("\n"):
-        if fmt.COAUTHOR_RE.fullmatch(line) or ASSISTANT_RE.fullmatch(line):
+        if fmt.COAUTHOR_RE.fullmatch(line) or fmt.agent_lines(line):
             continue
         if not subject_seen and line.strip():
             subject_seen = True
@@ -314,9 +318,11 @@ def diagnose(cwd: str, *, base_arg=None, profile_arg=None, check_pr=True) -> Sta
             why = "CI fails on it" if s.profile == "flow" else "commits never carry one"
             F(finding("C3", "error", f"`{c.subject}` has a Co-Authored-By trailer: {why} (git.md 5){where}",
                       commit=c.short, fix="remove the trailer" if not pushed else "tell the person", auto=auto))
-        if ASSISTANT_RE.search(msg):
-            F(finding("C6", "warn", f"`{c.subject}` has an assistant line (Claude-Session, Generated with …): "
-                      f"say it in the PR instead (ai-guardrails.md 3){where}", commit=c.short, auto=auto))
+        if fmt.agent_lines(msg):
+            why = "CI fails on it" if s.profile == "flow" else "nothing in git names the agent"
+            F(finding("C6", "error", f"`{c.subject}` names the agent that did the work (Claude-Session, Generated with …): "
+                      f"{why} (git.md 5){where}", commit=c.short,
+                      fix="remove the line" if not pushed else "tell the person", auto=auto))
         if c.is_merge or fmt.subject_exempt(c.subject):
             continue
         if fmt.AUTOSQUASH_RE.match(c.subject):
@@ -338,7 +344,7 @@ def diagnose(cwd: str, *, base_arg=None, profile_arg=None, check_pr=True) -> Sta
                       fix=None if body_only else "reword the subject without the keyword",
                       auto=auto if body_only else None))
         body = [x for x in fmt.message_lines(msg, "")[1:] if x.strip()
-                and not fmt.COAUTHOR_RE.fullmatch(x) and not ASSISTANT_RE.fullmatch(x) and not CLOSING_LINE_RE.fullmatch(x)]
+                and not fmt.COAUTHOR_RE.fullmatch(x) and not fmt.agent_lines(x) and not CLOSING_LINE_RE.fullmatch(x)]
         if body and s.profile in ("flow", "team"):
             F(finding("C5", "info", f"`{c.subject}` has a body: commits are one line (git.md 5); the why goes in the PR",
                       commit=c.short))
@@ -404,6 +410,9 @@ def diagnose(cwd: str, *, base_arg=None, profile_arg=None, check_pr=True) -> Sta
             for p in fmt.check_body(pr.get("body", ""), branch_issue=issue):
                 F(finding("P2", fmt_level, p, fix=f"gh pr edit {pr['number']} --body-file <file>: `Fixes #{issue or 'N'}` if this PR "
                           "completes the issue, `Refs #N` if it is part of it, or tick \"No issue needed\""))
+            for p in checks_pr_agent(pr):
+                F(finding("P4", "error", p + (": CI fails on it" if s.profile == "flow" else ""),
+                          fix=f"gh pr edit {pr['number']} --body-file <file> (or --title): drop the line"))
             if pr.get("baseRefName") != want:
                 F(finding("P3", "warn", f"PR #{pr['number']} targets `{pr.get('baseRefName')}`, it should target `{want}` (git.md 6, 9)",
                           fix=f"gh pr edit {pr['number']} --base {want}", auto="--fix-pr"))
