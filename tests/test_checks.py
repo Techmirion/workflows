@@ -211,3 +211,18 @@ def test_check_trailers_cli_fails(repo, tmp_path):
     ev.write_text("not json")
     p = subprocess.run(tm + ["--event", str(ev), "--event-name", "push"], capture_output=True, text=True)
     assert p.returncode == 1 and "could not run" in p.stdout
+
+
+def test_agent_lines_fail_in_commits_and_in_the_pr(repo):
+    base = sha(repo)
+    git(repo, "checkout", "-q", "-b", "chore/x")
+    git(repo, "commit", "-q", "--allow-empty", "--no-verify", "-m", "chore(x): one", "-m",
+        "Claude-Session: https://claude.ai/code/session_x")
+    head = sha(repo)
+    assert len(checks.trailer_problems(f"{base}..{head}", cwd=repo)) == 1
+    body = "Fixes #34\n\n- [x] An AI assistant did part of this work: Claude\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)"
+    problems = checks.event_trailer_problems("pull_request", pr_event(repo, base, head, body=body), cwd=repo)
+    assert len(problems) == 2
+    assert problems[0].startswith("the PR body names the agent") and "commit" in problems[1]
+    clean = sha(repo, "HEAD~1")
+    assert checks.event_trailer_problems("pull_request", pr_event(repo, base, clean), cwd=repo) == []

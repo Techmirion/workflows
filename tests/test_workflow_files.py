@@ -148,6 +148,9 @@ def test_pr_template_matches_the_body_check():
     assert fmt.check_body(text)  # untouched template warns
     assert fmt.check_body(text.replace("Fixes #\n", "Fixes #34\n")) == []
     assert fmt.check_body(text.replace("- [ ] No issue needed", "- [x] No issue needed")) == []
+    # the template names no agent, ticked or not (git.md 6)
+    assert "AI assistant" not in text
+    assert fmt.check_no_agent(text.replace("[ ]", "[x]")) == []
 
 
 def test_own_pr_template_is_the_template():
