@@ -45,12 +45,12 @@ def test_secrets_and_apps_when_given():
 
 
 def test_files_and_hooks_for_a_clone(tmp_path):
-    steps = repoinit.plan("T/app", clone=str(tmp_path), owner="patriarxis")
+    steps = repoinit.plan("T/app", clone=str(tmp_path), owner="patriarxic")
     assert "files" in kinds(steps) and "local" in kinds(steps)
     for src, _ in repoinit.template_targets(str(tmp_path)):
         assert src.exists(), src
-    text = repoinit.render_template(repoinit.TEMPLATES / ".github" / "CODEOWNERS", "patriarxis", None)
-    assert "* @patriarxis @DEPUTY" in text
+    text = repoinit.render_template(repoinit.TEMPLATES / ".github" / "CODEOWNERS", "patriarxic", None)
+    assert "* @patriarxic @DEPUTY" in text
 
 
 def test_agents_notes_for_every_assistant(tmp_path):
@@ -60,10 +60,10 @@ def test_agents_notes_for_every_assistant(tmp_path):
     assert (repoinit.TEMPLATES / "CLAUDE.md").read_text(encoding="utf-8") == "@AGENTS.md\n"
     src = repoinit.TEMPLATES / "AGENTS.md"
     assert src.read_text(encoding="utf-8").startswith("# REPO\n")
-    text = repoinit.render_template(src, "patriarxis", None, "Techmirion/scam-shield")
+    text = repoinit.render_template(src, "patriarxic", None, "Techmirion/scam-shield")
     assert text.startswith("# scam-shield\n") and "REPO" not in text
     assert repoinit.render_template(src, None, None).startswith("# REPO\n")  # no repo: left for the owner
-    steps = repoinit.plan("Techmirion/app", clone=str(tmp_path), owner="patriarxis")
+    steps = repoinit.plan("Techmirion/app", clone=str(tmp_path), owner="patriarxic")
     assert next(s for s in steps if s["kind"] == "files")["repo"] == "Techmirion/app"
 
 
