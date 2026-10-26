@@ -162,8 +162,17 @@ class GitHubForge:
                 return False
             raise
 
-    def delete_branch(self, branch: str) -> None:
-        self._req("DELETE", self._r(f"/git/refs/heads/{urllib.parse.quote(branch)}"))
+    def delete_branch(self, branch: str) -> bool:
+        """Delete a branch. False when it was already gone (GitHub answers 422
+        "Reference does not exist", or 404): someone else deleted it first,
+        Dependabot for example, between the check and the delete."""
+        try:
+            self._req("DELETE", self._r(f"/git/refs/heads/{urllib.parse.quote(branch)}"))
+            return True
+        except ForgeError as e:
+            if "HTTP 404" in str(e) or ("HTTP 422" in str(e) and "Reference does not exist" in str(e)):
+                return False
+            raise
 
     def request_reviewers(self, number: int, users: list[str], teams: list[str]) -> None:
         self._req("POST", self._r(f"/pulls/{number}/requested_reviewers"), {
@@ -331,13 +340,16 @@ class LocalForge:
         self._save(st)
         return p.returncode == 0
 
-    def delete_branch(self, branch: str) -> None:
+    def delete_branch(self, branch: str) -> bool:
         if branch in ("dev", "main"):
             raise ForgeError(f"refusing to delete {branch}")
+        if self.branch_sha(branch) is None:
+            return False
         self._git("push", "-q", "origin", "--delete", branch)
         st = self._load()
         self._log(st, f"branch {branch} deleted")
         self._save(st)
+        return True
 
     def request_reviewers(self, number: int, users: list[str], teams: list[str]) -> None:
         st = self._load()
