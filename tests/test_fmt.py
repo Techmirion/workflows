@@ -303,3 +303,42 @@ def test_agent_line_not_found(text):
 def test_our_agent_with_an_outside_one_is_still_refused():
     assert len(fmt.agent_lines("- [x] An AI assistant did part of this work: Omicron and Claude")) == 1
     assert fmt.check_no_coauthor("fix(a): b\n\nCo-Authored-By: Omicron <o@techmirion.com>")  # trailer: still refused
+
+
+# --- one line and merge subjects (git.md 5, #25) -----------------------------
+
+@pytest.mark.parametrize("text", [
+    "fix(a): b",
+    "fix(a): b\n",
+    "fix(a): b\n\n# a comment git drops\n",
+    "fix(a): b\n\nCo-Authored-By: X <x@example.org>",  # reported by check_no_coauthor
+    "fix(a): b\n\nFixes #34",  # reported as a closing keyword
+    "fix(a): b\n# ------------------------ >8 ------------------------\nthe diff\n",
+])
+def test_one_line_passes(text):
+    assert fmt.check_one_line(text) == []
+
+
+def test_body_is_reported():
+    problems = fmt.check_one_line("fix(a): b\n\nwhy it was done\nand how\n")
+    assert len(problems) == 1 and "body (2 lines)" in problems[0]
+
+
+@pytest.mark.parametrize("s", [
+    "Merge branch 'dev' into fix/34-x",
+    "Merge pull request #12 from Techmirion/fix/34-x",
+    "Merge remote-tracking branch 'origin/dev'",
+    "chore(dev): merge feat/shell into dev",
+])
+def test_merge_subjects_that_pass(s):
+    assert fmt.check_merge_subject(s) == []
+
+
+@pytest.mark.parametrize("s", [
+    "Merge #35 (s2528/fp-kanon-port-combobox)",
+    "merge dev into chore/playwright-1-64",
+    "merge(next): tasks",
+    "Merge main into dev",
+])
+def test_hand_written_merge_subjects_fail(s):
+    assert fmt.check_merge_subject(s)

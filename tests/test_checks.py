@@ -226,3 +226,18 @@ def test_agent_lines_fail_in_commits_and_in_the_pr(repo):
     assert problems[0].startswith("the PR body names the agent") and "commit" in problems[1]
     clean = sha(repo, "HEAD~1")
     assert checks.event_trailer_problems("pull_request", pr_event(repo, base, clean), cwd=repo) == []
+
+
+def test_hand_written_merge_and_body_warn_on_push(repo):
+    git(repo, "checkout", "-q", "-b", "dev")
+    before = sha(repo)
+    branch_with(repo, "chore/x", "chore(x): y")
+    git(repo, "checkout", "-q", "dev")
+    git(repo, "merge", "-q", "--no-ff", "-m", "Merge #35 (chore/x)", "chore/x")
+    commit_file(repo, "b.txt", "1", "fix(a): good\n\nwith a body")
+    git(repo, "checkout", "-q", "-b", "chore/z")
+    git(repo, "checkout", "-q", "dev")
+    git(repo, "merge", "-q", "--no-ff", "--no-edit", "chore/z")  # nothing to merge: no commit
+    text = "\n".join(checks.push_problems({"before": before, "after": sha(repo)}, cwd=repo))
+    assert "merge commit" in text and "Merge #35" in text
+    assert "body (1 line)" in text
