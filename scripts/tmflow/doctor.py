@@ -323,7 +323,14 @@ def diagnose(cwd: str, *, base_arg=None, profile_arg=None, check_pr=True) -> Sta
             F(finding("C6", "error", f"`{c.subject}` names the agent that did the work (Claude-Session, Generated with …): "
                       f"{why} (git.md 5){where}", commit=c.short,
                       fix="remove the line" if not pushed else "tell the person", auto=auto))
-        if c.is_merge or fmt.subject_exempt(c.subject):
+        if c.is_merge:
+            probs = fmt.check_merge_subject(c.subject)
+            if probs and team:
+                F(finding("C1", fmt_level, probs[0] + where, commit=c.short,
+                          fix=None if pushed else "reword the merge: `git commit --amend` right after it, or keep "
+                          "git's own `Merge branch …` subject"))
+            continue
+        if fmt.subject_exempt(c.subject):
             continue
         if fmt.AUTOSQUASH_RE.match(c.subject):
             F(finding("C7", "info", f"`{c.subject}`: squash it before review (`git rebase -i --autosquash {s.base or 'BASE'}`)",

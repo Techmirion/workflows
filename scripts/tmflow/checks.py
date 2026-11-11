@@ -20,12 +20,18 @@ def _is_bot(login: str | None) -> bool:
 def commit_problems(rng: str, cwd: str | None = None) -> list[str]:
     problems = []
     for c in gitutil.commits(rng, cwd=cwd):
-        if len(c["parents"]) > 1:
-            continue  # merge commits are exempt
         if c["author"] == "dependabot[bot]" or c["email"].endswith("dependabot[bot]@users.noreply.github.com"):
+            continue
+        if len(c["parents"]) > 1:
+            # a merge keeps git's or GitHub's own subject, or is written as type(place): message
+            for p in fmt.check_merge_subject(c["subject"]):
+                problems.append(f"merge commit {c['sha'][:7]}: {p}")
             continue
         for p in fmt.check_subject(c["subject"]):
             problems.append(f"commit {c['sha'][:7]}: {p}")
+        if not fmt.subject_exempt(c["subject"]) and not fmt.AUTOSQUASH_RE.match(c["subject"]):
+            for p in fmt.check_one_line(c["subject"] + "\n\n" + c.get("body", ""), ""):
+                problems.append(f"commit {c['sha'][:7]} `{c['subject'][:60]}`: {p}")
         if not fmt.subject_exempt(c["subject"]):
             refs = fmt.closing_refs(c["subject"] + "\n" + c.get("body", ""))
             if refs:

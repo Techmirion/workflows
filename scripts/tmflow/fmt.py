@@ -52,7 +52,7 @@ RELEASE_TITLE_RE = re.compile(
 )
 #: A trailing parenthesis that looks like a reference but is not a valid one.
 BAD_REF_TAIL_RE = re.compile(r"\([^()]*#[^()]*\)$")
-#: Exemptions (git.md 14): merge and revert commits.
+#: Exemptions (git.md 14): git's and GitHub's own merge subjects, and reverts.
 MERGE_SUBJECT_RE = re.compile(
     r"^Merge (?:pull request #[0-9]+ from |branch |branches |remote-tracking branch |tag |commit |[0-9a-f]{7,40} )"
 )
@@ -280,6 +280,32 @@ def check_no_agent(text: str, *, what: str = "the message") -> list[str]:
         return []
     return [f"{what} names the agent that did the work (`{lines[0][:60]}`): nothing in git does (git.md 5), remove the line"]
 
+
+
+def body_lines(text: str, comment_char: str = "#") -> list[str]:
+    """The non-empty lines after the subject, as git keeps them (comments and scissors cut)."""
+    return [line for line in message_lines(text, comment_char) if line.strip()][1:]
+
+
+def check_one_line(text: str, comment_char: str = "#") -> list[str]:
+    """A commit message is one line, no body (git.md 5): the why goes in the PR. Lines that
+    other checks report on their own (Co-Authored-By, agent lines, closing keywords) are left
+    to them. The caller exempts merges, reverts, fixup!/squash! and bots."""
+    rest = [line for line in body_lines(text, comment_char)
+            if not COAUTHOR_RE.fullmatch(line) and not agent_lines(line) and not closing_refs(line)]
+    if not rest:
+        return []
+    n = len(rest)
+    return [f"the message has a body ({n} line{'s' if n > 1 else ''}): a commit is one line (git.md 5), "
+            "the why goes in the PR"]
+
+
+def check_merge_subject(subject: str) -> list[str]:
+    """A merge commit keeps git's or GitHub's own subject (`Merge branch …`, `Merge pull request
+    #N from …`), or is written as `type(place): message` like any commit (git.md 5)."""
+    if not subject or subject_exempt(subject):
+        return []
+    return check_subject(subject)
 
 # --- PR bodies --------------------------------------------------------------
 

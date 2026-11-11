@@ -169,3 +169,13 @@ def test_fixed_message_drops_assistant_lines(line):
 
 def test_fixed_message_keeps_a_bad_subject_word_for_word():
     assert doctor.fixed_message("Fixed it\n", issue=3, add_ref=True, drop_closing=True) == "Fixed it\n"
+
+
+def test_hand_written_merge_is_reported(flow):
+    commit_file(flow, "a.txt", "1", "fix(auth): redirect after login (#34)")
+    git(flow, "checkout", "-q", "-b", "chore/x", "origin/dev")
+    commit_file(flow, "b.txt", "1", "chore(x): y")
+    git(flow, "checkout", "-q", "fix/34-login-redirect")
+    git(flow, "merge", "-q", "--no-ff", "-m", "merge chore/x into fix", "chore/x")
+    d = run(flow)
+    assert any(f["code"] == "C1" and "merge chore/x" in f["message"] for f in d["findings"])
