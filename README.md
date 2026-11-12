@@ -35,6 +35,16 @@ jobs:
       workflows-ref: v1        # keep equal to the ref after @
 ```
 
+A repo whose dependencies are private packages (the Kanon `@techmirion/*` packages on
+GitHub Packages) passes a read token to the setup command, which only sees it as the env var
+`NPM_TOKEN` (not the tests or the linters); the repo's `.npmrc` reads `${NPM_TOKEN}`:
+
+```yaml
+    uses: Techmirion/workflows/.github/workflows/checks.yml@v1
+    secrets:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}   # a classic PAT with read:packages, as a repo secret
+```
+
 | Caller | Trigger | Does |
 |---|---|---|
 | `checks.yml` | PR into dev or main (opened, synchronize, reopened, edited); push to dev or main | tests, lint, gitleaks, `Co-Authored-By:` trailers and lines naming the agent in the new commits and the PR title and body (these fail); format checks of branch, commits, PR title and body as **warnings** |
