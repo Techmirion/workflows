@@ -35,14 +35,22 @@ jobs:
       workflows-ref: v1        # keep equal to the ref after @
 ```
 
-A repo whose dependencies are private packages (the Kanon `@techmirion/*` packages on
-GitHub Packages) passes a read token to the setup command, which only sees it as the env var
-`NPM_TOKEN` (not the tests or the linters); the repo's `.npmrc` reads `${NPM_TOKEN}`:
+A repo that installs the Kanon packages (`@techmirion/*` on GitHub Packages, public, but the
+registry wants a token even to read them) needs an `.npmrc` that points `@techmirion` at
+`https://npm.pkg.github.com` and reads `${NPM_TOKEN}`, and `packages: read` in the permissions of
+its `checks.yml` caller (a called job cannot have more than its caller). The setup command then
+gets the repo's own workflow token as the env var `NPM_TOKEN` (not the tests or the linters). No
+secret to create. A repo with private packages passes its own `NPM_TOKEN` secret, which wins:
 
 ```yaml
+permissions:
+  contents: read
+  packages: read
+jobs:
+  checks:
     uses: Techmirion/workflows/.github/workflows/checks.yml@v1
     secrets:
-      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}   # a classic PAT with read:packages, as a repo secret
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}   # only for private packages
 ```
 
 | Caller | Trigger | Does |

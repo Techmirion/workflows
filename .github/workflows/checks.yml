@@ -67,6 +67,9 @@ jobs:
     timeout-minutes: ${{ inputs.timeout-minutes }}
     permissions:
       contents: read
+      # reads the public Kanon packages on GitHub Packages (a token is needed even for public ones);
+      # the caller must allow it too (`packages: read` in its own permissions), a job cannot exceed it
+      packages: read
     steps:
       - name: Check out the repo (the merge result, for a PR)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -100,7 +103,8 @@ jobs:
         working-directory: repo
         env:
           CMD: ${{ inputs.setup-command }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          # the repo's own workflow token reads public packages; a repo can pass NPM_TOKEN to read private ones
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN || github.token }}
         run: bash -eo pipefail -c "$CMD"
 
       - name: Tests
