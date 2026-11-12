@@ -190,6 +190,8 @@ def test_every_path_in_template_list_exists():
     from tmflow import repoinit
     for rel in repoinit.TEMPLATE_FILES:
         assert (ROOT / "templates" / rel).exists(), rel
+    for rel in (*repoinit.LICENCES.values(), repoinit.ENV_EXAMPLE):
+        assert (ROOT / "templates" / rel).exists(), rel
     assert Path(ROOT / "templates" / "gitignore").exists()
 
 

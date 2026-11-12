@@ -10,7 +10,7 @@ What is here:
 |---|---|
 | `.github/workflows/{checks,assign-reviewers,cleanup,release-pr,release,sync-dev}.yml` | the reusable workflows (`on: workflow_call`) |
 | `.github/workflows/self-*.yml` | this repo's own callers of the same workflows |
-| `templates/` | ready-to-copy files for a repo: the five caller workflows, PR template, issue forms, CODEOWNERS, dependabot, pre-commit config, the `.gitignore` block of section 11, and `AGENTS.md` with a one-line `CLAUDE.md` that imports it |
+| `templates/` | ready-to-copy files for a repo: the five caller workflows, PR template, issue forms, CODEOWNERS, dependabot, pre-commit config, the `.gitignore` block of section 11, a `LICENSE` for private (proprietary) and public (MIT) repos, a `.env.example` stub, and `AGENTS.md` with a one-line `CLAUDE.md` that imports it |
 | `hooks/` | the git hooks: `pre-commit` (gitleaks), `prepare-commit-msg` (adds `(#N)`), `commit-msg` (checks the format, refuses `Co-Authored-By:` and lines naming the agent) |
 | `.pre-commit-hooks.yaml` | the same hooks, for `pre-commit` |
 | `labels.json` | the one label set (section 13), plus `wip` (section 6) |
@@ -136,7 +136,10 @@ security PRs off, the labels, branch protection and secret scanning for public
 repos, the three Apps, the files from `templates/`, and the hooks. Without
 `--apply` it prints the commands and changes nothing.
 
-Existing files are kept. `AGENTS.md` gets the repo's name as its title; it is
+Existing files are kept. A repo without a licence gets `LICENSE`: proprietary when
+private, MIT when public (`--visibility`); a repo with its own (`LICENSE.md`,
+`LICENSE-MIT`, `COPYING`) keeps it. `.env.example` is a stub that lists no names:
+fill it in, or delete it if the repo reads no environment variables. `AGENTS.md` gets the repo's name as its title; it is
 skipped when the repo already has a `CLAUDE.md`, because pi reads `AGENTS.md`
 first and an empty stub would hide the real notes: move them into `AGENTS.md`
 and leave `@AGENTS.md` in `CLAUDE.md`.
