@@ -170,8 +170,8 @@ def cmd_cleanup(a):
         merged=facts["merged"], head=facts["head"], head_repo=facts["head_repo"], base_repo=facts["base_repo"],
         default_branch=facts["default_branch"], protected=a.protected.split(), branch_sha=branch_sha,
         pr_head_sha=facts["head_sha"], other_open_prs=len(others))
-    if delete and not a.dry_run:
-        forge.delete_branch(facts["head"])
+    if delete and not a.dry_run and not forge.delete_branch(facts["head"]):
+        delete, reason = False, f"`{facts['head']}` was already gone when the delete ran"
     _summary(f"cleanup PR #{facts['number']}: {'delete' if delete else 'keep'} `{facts['head']}`: {reason}"
              + (" (dry run)" if a.dry_run and delete else ""))
     return 0

@@ -48,6 +48,15 @@ on:
         type: number
         default: 20
 
+    secrets:
+      NPM_TOKEN:
+        description: >-
+          Optional. A token that can read the repo's private npm packages (for the Techmirion
+          Kanon packages on GitHub Packages: a classic PAT with read:packages). Exposed to the
+          setup command only, as the env var NPM_TOKEN, for an .npmrc that reads ${NPM_TOKEN}.
+          Not passed to the tests or the linters.
+        required: false
+
 permissions:
   contents: read
 
@@ -76,7 +85,7 @@ jobs:
 
       - name: Set up Python
         if: inputs.python-version != ''
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: ${{ inputs.python-version }}
 
@@ -91,6 +100,7 @@ jobs:
         working-directory: repo
         env:
           CMD: ${{ inputs.setup-command }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: bash -eo pipefail -c "$CMD"
 
       - name: Tests

@@ -199,3 +199,12 @@ def test_checks_fail_on_a_coauthor_trailer():
     assert len(trailer) == 1
     assert "continue-on-error" not in trailer[0]
     assert trailer[0]["if"] == "${{ !cancelled() }}"
+
+
+def test_checks_npm_token_reaches_only_the_setup_step():
+    wf = load(WF / "checks.yml")
+    secret = on(wf)["workflow_call"]["secrets"]["NPM_TOKEN"]
+    assert secret["required"] is False
+    steps = wf["jobs"]["checks"]["steps"]
+    holders = [s["name"] for s in steps if "NPM_TOKEN" in s.get("env", {})]
+    assert holders == ["Setup"]

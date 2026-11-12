@@ -262,3 +262,41 @@ def test_coauthor_below_the_scissors_is_ignored(hooked_repo, tmp_path):
     git(hooked_repo, "add", "a.txt")
     git(hooked_repo, "commit", "-q", "-v", env={**env_with_gitleaks(), "GIT_EDITOR": str(editor)})
     assert subject(hooked_repo) == "chore(x): verbose"
+
+
+def _merge_setup(repo, env):
+    git(repo, "checkout", "-q", "-b", "dev")
+    git(repo, "checkout", "-q", "-b", "chore/x")
+    commit_file(repo, "x.txt", "1", "chore(x): y", env=env)
+    git(repo, "checkout", "-q", "dev")
+
+
+def test_hand_written_merge_subject_refused(hooked_repo):
+    env = env_with_gitleaks()
+    _merge_setup(hooked_repo, env)
+    head = git(hooked_repo, "rev-parse", "HEAD").stdout
+    p = git(hooked_repo, "merge", "-q", "--no-ff", "-m", "Merge #35 (chore/x)", "chore/x", check=False, env=env)
+    assert p.returncode != 0 and "Merge #35" in p.stderr
+    git(hooked_repo, "merge", "--abort", check=False)
+    assert git(hooked_repo, "rev-parse", "HEAD").stdout == head
+
+
+def test_merge_written_as_type_place_passes(hooked_repo):
+    env = env_with_gitleaks()
+    _merge_setup(hooked_repo, env)
+    git(hooked_repo, "merge", "-q", "--no-ff", "-m", "chore(dev): merge chore/x into dev", "chore/x", env=env)
+    assert subject(hooked_repo) == "chore(dev): merge chore/x into dev"
+
+
+def test_body_refused(hooked_repo):
+    git(hooked_repo, "checkout", "-q", "-b", "chore/x")
+    p = commit_file(hooked_repo, "a.txt", "1", "chore(x): y\n\nbecause of z", check=False, env=env_with_gitleaks())
+    assert p.returncode != 0 and "one line" in p.stderr
+
+
+def test_revert_keeps_its_body(hooked_repo):
+    env = env_with_gitleaks()
+    git(hooked_repo, "checkout", "-q", "-b", "chore/x")
+    commit_file(hooked_repo, "a.txt", "1", "chore(x): y", env=env)
+    git(hooked_repo, "revert", "--no-edit", "HEAD", env=env)
+    assert "This reverts commit" in git(hooked_repo, "log", "-1", "--format=%B").stdout
