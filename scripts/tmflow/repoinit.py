@@ -70,8 +70,10 @@ def ruleset(app_id: str | None) -> dict:
         "rules": [
             {"type": "deletion"},
             {"type": "non_fast_forward"},
+            # A PR is required, approvals are not: review is a convention (handbook git.md 7),
+            # the required check and the no-force-push/no-delete rules are what GitHub enforces.
             {"type": "pull_request", "parameters": {
-                "required_approving_review_count": 1,
+                "required_approving_review_count": 0,
                 "dismiss_stale_reviews_on_push": False,
                 "require_code_owner_review": False,
                 "require_last_push_approval": False,

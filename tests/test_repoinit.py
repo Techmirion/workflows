@@ -31,7 +31,7 @@ def test_public_repo_gets_protection_with_app_bypass():
     types = [r["type"] for r in rs["rules"]]
     assert types == ["deletion", "non_fast_forward", "pull_request", "required_status_checks"]
     pr_rule = rs["rules"][2]["parameters"]
-    assert pr_rule["required_approving_review_count"] == 1 and pr_rule["allowed_merge_methods"] == ["merge"]
+    assert pr_rule["required_approving_review_count"] == 0 and pr_rule["allowed_merge_methods"] == ["merge"]
     assert rs["bypass_actors"] == [{"actor_id": 123, "actor_type": "Integration", "bypass_mode": "always"}]
     assert any(s.get("stdin_json", {}).get("security_and_analysis") for s in steps)
 
