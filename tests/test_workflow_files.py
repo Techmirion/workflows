@@ -206,6 +206,6 @@ def test_checks_npm_token_reaches_only_the_setup_step():
     secret = on(wf)["workflow_call"]["secrets"]["NPM_TOKEN"]
     assert secret["required"] is False
     job = wf["jobs"]["checks"]
-    assert job["permissions"] == {"contents": "read", "packages": "read"}
+    assert job["permissions"] == {"contents": "read"}  # more would break every caller that allows only this
     holders = {s["name"]: s["env"]["NPM_TOKEN"] for s in job["steps"] if "NPM_TOKEN" in s.get("env", {})}
     assert holders == {"Setup": "${{ secrets.NPM_TOKEN || github.token }}"}
