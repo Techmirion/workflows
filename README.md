@@ -37,7 +37,7 @@ jobs:
 
 A repo that installs the Kanon packages (`@techmirion/*` on GitHub Packages, public, but the
 registry wants a token even to read them) needs an `.npmrc` that points `@techmirion` at
-`https://npm.pkg.github.com` and reads `${NPM_TOKEN}`, The setup command then
+`https://npm.pkg.github.com` and reads `${NPM_TOKEN}`. The setup command then
 gets the repo's own workflow token as the env var `NPM_TOKEN` (not the tests or the linters). No
 secret to create. A repo with private packages passes its own `NPM_TOKEN` secret, which wins:
 
