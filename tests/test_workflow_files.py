@@ -8,7 +8,7 @@ import yaml
 from conftest import ROOT
 from tmflow import fmt, labels
 
-REUSABLE = ["checks", "assign-reviewers", "cleanup", "release-pr", "release", "sync-dev"]
+REUSABLE = ["checks", "checks-packages", "assign-reviewers", "cleanup", "release-pr", "release", "sync-dev"]
 WF = ROOT / ".github" / "workflows"
 TPL = ROOT / "templates" / ".github" / "workflows"
 ALL = sorted(WF.glob("*.yml")) + sorted(TPL.glob("*.yml"))
@@ -89,7 +89,7 @@ def test_writes_go_through_the_automation_app():
         assert doc["jobs"][name]["permissions"] == {"contents": "read"}
 
 
-@pytest.mark.parametrize("name", REUSABLE)
+@pytest.mark.parametrize("name", [n for n in REUSABLE if n != "checks-packages"])  # opt-in, no template
 def test_templates_call_the_shared_workflow(name):
     doc = load(TPL / f"{name}.yml")
     (job,) = doc["jobs"].values()
@@ -205,7 +205,19 @@ def test_checks_npm_token_reaches_only_the_setup_step():
     wf = load(WF / "checks.yml")
     secret = on(wf)["workflow_call"]["secrets"]["NPM_TOKEN"]
     assert secret["required"] is False
-    job = wf["jobs"]["checks"]
-    assert job["permissions"] == {"contents": "read"}  # more would break every caller that allows only this
-    holders = {s["name"]: s["env"]["NPM_TOKEN"] for s in job["steps"] if "NPM_TOKEN" in s.get("env", {})}
-    assert holders == {"Setup": "${{ secrets.NPM_TOKEN || github.token }}"}
+    steps = wf["jobs"]["checks"]["steps"]
+    holders = [s["name"] for s in steps if "NPM_TOKEN" in s.get("env", {})]
+    assert holders == ["Setup"]
+
+
+def test_checks_packages_is_checks_plus_the_package_token():
+    a = (WF / "checks.yml").read_text()
+    b = (WF / "checks-packages.yml").read_text()
+    drop = lambda text: [l for l in text.splitlines() if not l.lstrip().startswith("#")]
+    extra = [l for l in drop(b) if l not in drop(a)]
+    assert sorted(x.strip() for x in extra) == sorted([
+        "packages: read", "packages: read", "NPM_TOKEN: ${{ secrets.NPM_TOKEN || github.token }}"])
+    assert [l for l in drop(a) if l not in drop(b)] == ["          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}"]
+    doc = load(WF / "checks-packages.yml")
+    job = doc["jobs"]["checks"]
+    assert doc["permissions"] == job["permissions"] == {"contents": "read", "packages": "read"}

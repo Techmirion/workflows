@@ -100,8 +100,7 @@ jobs:
         working-directory: repo
         env:
           CMD: ${{ inputs.setup-command }}
-          # the repo's own workflow token reads public packages; a repo can pass NPM_TOKEN to read private ones
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN || github.token }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: bash -eo pipefail -c "$CMD"
 
       - name: Tests
