@@ -31,7 +31,7 @@ def test_public_repo_gets_protection_with_app_bypass():
     types = [r["type"] for r in rs["rules"]]
     assert types == ["deletion", "non_fast_forward", "pull_request", "required_status_checks"]
     pr_rule = rs["rules"][2]["parameters"]
-    assert pr_rule["required_approving_review_count"] == 1 and pr_rule["allowed_merge_methods"] == ["merge"]
+    assert pr_rule["required_approving_review_count"] == 0 and pr_rule["allowed_merge_methods"] == ["merge"]
     assert rs["bypass_actors"] == [{"actor_id": 123, "actor_type": "Integration", "bypass_mode": "always"}]
     assert any(s.get("stdin_json", {}).get("security_and_analysis") for s in steps)
 
@@ -103,3 +103,33 @@ def test_merge_gitignore_keeps_existing_entries():
     assert new.startswith(old)
     assert new.count("__pycache__/") == 1 and ".env\n" in new and ".venv/" in new
     assert repoinit.merge_gitignore(new, "# head\n.env\n") == new
+
+
+def test_licence_by_visibility(tmp_path):
+    year = str(__import__("datetime").date.today().year)
+    for vis, words in (("private", "All rights reserved."), ("public", "Permission is hereby granted")):
+        steps = repoinit.plan("T/app", visibility=vis, clone=str(tmp_path / vis))
+        files = next(s for s in steps if s["kind"] == "files")
+        assert files["visibility"] == vis
+        lic = dict((dst.name, src) for src, dst in repoinit.template_targets(files["clone"], vis))["LICENSE"]
+        text = repoinit.render_template(lic, None, None)
+        assert words in text and f"Copyright (c) {year} Techmirion" in text and "YEAR" not in text
+
+
+def test_new_repo_gets_licence_and_env_example(tmp_path):
+    steps = [s for s in repoinit.plan("T/app", clone=str(tmp_path)) if s["kind"] == "files"]
+    repoinit.apply("T/app", steps)
+    assert "All rights reserved." in (tmp_path / "LICENSE").read_text()
+    env = (tmp_path / ".env.example").read_text()
+    assert all(not ln or ln.startswith("#") for ln in env.splitlines())  # names only, nothing set
+
+
+def test_own_licence_is_kept(tmp_path):
+    (tmp_path / "LICENSE-MIT").write_text("MIT License\n")
+    (tmp_path / ".env.example").write_text("API_URL=\n")
+    steps = [s for s in repoinit.plan("T/app", clone=str(tmp_path)) if s["kind"] == "files"]
+    out = repoinit.describe(steps, "T/app")
+    assert f"skip {tmp_path / 'LICENSE'}" in out and "LICENSE-MIT" in out
+    repoinit.apply("T/app", steps)
+    assert not (tmp_path / "LICENSE").exists()
+    assert (tmp_path / ".env.example").read_text() == "API_URL=\n"

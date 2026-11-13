@@ -6,6 +6,7 @@ not even call `gh`. With --apply it runs them as the person who is logged in to
 """
 from __future__ import annotations
 
+import datetime
 import json
 import shlex
 import shutil
@@ -54,6 +55,11 @@ TEMPLATE_FILES = [
     "CLAUDE.md",
 ]
 
+#: Files a repo gets when it has none of its own (handbook repo-hygiene.md).
+#: The licence depends on the visibility: proprietary for a private repo, MIT for a public one.
+LICENCES = {"private": "licences/proprietary.txt", "public": "licences/mit.txt"}
+ENV_EXAMPLE = "env.example"
+
 
 def ruleset(app_id: str | None) -> dict:
     rs = {
@@ -64,8 +70,10 @@ def ruleset(app_id: str | None) -> dict:
         "rules": [
             {"type": "deletion"},
             {"type": "non_fast_forward"},
+            # A PR is required, approvals are not: review is a convention (handbook git.md 7),
+            # the required check and the no-force-push/no-delete rules are what GitHub enforces.
             {"type": "pull_request", "parameters": {
-                "required_approving_review_count": 1,
+                "required_approving_review_count": 0,
                 "dismiss_stale_reviews_on_push": False,
                 "require_code_owner_review": False,
                 "require_last_push_approval": False,
@@ -131,7 +139,7 @@ def plan(repo: str, *, visibility: str = "private", clone: str | None = None, ow
         steps.append({"kind": "manual", "what": f"repo secret: gh secret set AUTOMATION_APP_KEY --repo {repo} < /path/to/automation-app.pem"})
     if clone:
         steps.append({"kind": "files", "what": f"files of git.md 13 from templates/ into {clone} (existing files are kept)",
-                      "clone": clone, "owner": owner, "deputy": deputy, "repo": repo})
+                      "clone": clone, "owner": owner, "deputy": deputy, "repo": repo, "visibility": visibility})
         if hooks == "plain":
             steps.append({"kind": "local", "what": "git hooks (plain, no network)",
                           "argv": ["sh", str(ROOT / "scripts" / "install-hooks.sh"), clone]})
@@ -141,8 +149,21 @@ def plan(repo: str, *, visibility: str = "private", clone: str | None = None, ow
     return steps
 
 
-def template_targets(clone: str) -> list[tuple[Path, Path]]:
-    return [(TEMPLATES / rel, Path(clone) / rel) for rel in TEMPLATE_FILES]
+def template_targets(clone: str, visibility: str = "private") -> list[tuple[Path, Path]]:
+    out = [(TEMPLATES / rel, Path(clone) / rel) for rel in TEMPLATE_FILES]
+    out.append((TEMPLATES / LICENCES[visibility], Path(clone) / "LICENSE"))
+    out.append((TEMPLATES / ENV_EXAMPLE, Path(clone) / ".env.example"))
+    return out
+
+
+def own_licence(folder: Path) -> str | None:
+    """The name of a licence file the repo already has under another name (LICENSE.md, LICENSE-MIT, COPYING)."""
+    if not folder.is_dir():
+        return None
+    for p in sorted(folder.iterdir()):
+        if p.is_file() and p.name.upper().startswith(("LICENSE", "LICENCE", "COPYING")):
+            return p.name
+    return None
 
 
 def skip_reason(dst: Path) -> str | None:
@@ -150,6 +171,10 @@ def skip_reason(dst: Path) -> str | None:
     if dst.name == "AGENTS.md" and (dst.parent / "CLAUDE.md").exists():
         # pi reads AGENTS.md before CLAUDE.md: an empty stub would hide the notes the repo has.
         return "the repo has a CLAUDE.md: move its notes into AGENTS.md and leave `@AGENTS.md` in CLAUDE.md"
+    if dst.name == "LICENSE":
+        have = own_licence(dst.parent)
+        if have:
+            return f"the repo has its own licence ({have}): it keeps it"
     return None
 
 
@@ -165,6 +190,8 @@ def merge_gitignore(existing: str, template: str) -> str:
 
 def render_template(src: Path, owner: str | None, deputy: str | None, repo: str | None = None) -> str:
     text = src.read_text(encoding="utf-8")
+    if src.parent.name == "licences":
+        text = text.replace("YEAR", str(datetime.date.today().year))
     if src.name == "AGENTS.md" and repo:
         # The title line is `# REPO`: the repo's name without the org.
         text = text.replace("# REPO\n", f"# {repo.split('/')[-1]}\n", 1)
@@ -194,7 +221,7 @@ def describe(steps: list[dict], repo: str = "REPO") -> str:
         elif s["kind"] == "app":
             out.append(f"gh api -X PUT user/installations/{s['installation']}/repositories/<repo id>")
         elif s["kind"] == "files":
-            for src, dst in template_targets(s["clone"]):
+            for src, dst in template_targets(s["clone"], s.get("visibility", "private")):
                 why = None if dst.exists() else skip_reason(dst)
                 out.append(f"skip {dst}  ({why})" if why else f"{'keep' if dst.exists() else 'copy'} {dst}")
             out.append(f"merge missing git.md 11 entries into {Path(s['clone']) / '.gitignore'}")
@@ -238,7 +265,7 @@ def apply(repo: str, steps: list[dict]) -> None:  # pragma: no cover - needs Git
             repo_id = _run(["gh", "api", f"repos/{repo}", "--jq", ".id"]).stdout.strip()
             _run(["gh", "api", "-X", "PUT", f"user/installations/{s['installation']}/repositories/{repo_id}"])
         elif k == "files":
-            for src, dst in template_targets(s["clone"]):
+            for src, dst in template_targets(s["clone"], s.get("visibility", "private")):
                 if dst.exists():
                     print(f"   keep {dst}")
                     continue
