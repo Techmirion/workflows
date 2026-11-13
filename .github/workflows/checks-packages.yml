@@ -1,0 +1,146 @@
+# Reusable workflow: checks.yml for a repo that installs the public Kanon packages (@techmirion/* on
+# GitHub Packages). The registry wants a token even to read public packages, and the workflow token
+# only has one with `packages: read`, which a called job can only have when its caller allows it too,
+# so this is a file of its own: checks.yml stays as it is for every other caller. Keep the two in
+# step (a test compares them). Tests, lint, gitleaks and the format checks (git.md 6 and 14).
+# Callers run it on every PR into dev or main and on every push to dev and main.
+# Tests, lint, gitleaks, a Co-Authored-By trailer and a line naming the agent fail the check;
+# the format checks only warn.
+name: checks
+
+on:
+  workflow_call:
+    inputs:
+      test-command:
+        description: Shell command that runs the tests, from the repo root. Empty skips the step.
+        type: string
+        default: ""
+      lint-command:
+        description: Shell command that runs the linters, from the repo root. Empty skips the step.
+        type: string
+        default: ""
+      setup-command:
+        description: Shell command run before tests and lint (install dependencies). Empty skips it.
+        type: string
+        default: ""
+      python-version:
+        description: Python version for actions/setup-python. Empty uses the runner's python3.
+        type: string
+        default: ""
+      node-version:
+        description: Node version for actions/setup-node. Empty uses the runner's node.
+        type: string
+        default: ""
+      gitleaks-version:
+        description: Version of the gitleaks binary.
+        type: string
+        default: "8.30.1"
+      workflows-repo:
+        description: The repo holding the shared scripts.
+        type: string
+        default: Techmirion/workflows
+      workflows-ref:
+        description: Ref of the shared scripts. Keep it equal to the ref in the caller's `uses:` line.
+        type: string
+        default: v1
+      runs-on:
+        description: Runner label.
+        type: string
+        default: ubuntu-24.04
+      timeout-minutes:
+        description: Job timeout.
+        type: number
+        default: 20
+
+    secrets:
+      NPM_TOKEN:
+        description: >-
+          Optional. A token that can read the repo's private npm packages (for the Techmirion
+          Kanon packages on GitHub Packages: a classic PAT with read:packages). Exposed to the
+          setup command only, as the env var NPM_TOKEN, for an .npmrc that reads ${NPM_TOKEN}.
+          Not passed to the tests or the linters.
+        required: false
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  checks:
+    name: checks
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Check out the repo (the merge result, for a PR)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: repo
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check out the shared automation
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ inputs.workflows-repo }}
+          ref: ${{ inputs.workflows-ref }}
+          path: wf
+          persist-credentials: false
+
+      - name: Set up Python
+        if: inputs.python-version != ''
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      - name: Set up Node
+        if: inputs.node-version != ''
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ inputs.node-version }}
+
+      - name: Setup
+        if: inputs.setup-command != ''
+        working-directory: repo
+        env:
+          CMD: ${{ inputs.setup-command }}
+          # the repo's own workflow token reads the public packages; a repo can pass NPM_TOKEN for private ones
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN || github.token }}
+        run: bash -eo pipefail -c "$CMD"
+
+      - name: Tests
+        if: inputs.test-command != ''
+        working-directory: repo
+        env:
+          CMD: ${{ inputs.test-command }}
+        run: bash -eo pipefail -c "$CMD"
+
+      - name: Lint
+        if: ${{ !cancelled() && inputs.lint-command != '' }}
+        working-directory: repo
+        env:
+          CMD: ${{ inputs.lint-command }}
+        run: bash -eo pipefail -c "$CMD"
+
+      - name: Secret scan (gitleaks binary)
+        if: ${{ !cancelled() }}
+        env:
+          GITLEAKS_VERSION: ${{ inputs.gitleaks-version }}
+        run: |
+          sh wf/scripts/install-gitleaks.sh "$GITLEAKS_VERSION" "$RUNNER_TEMP/bin"
+          python3 wf/scripts/tm.py secret-scan --event "$GITHUB_EVENT_PATH" --event-name "$GITHUB_EVENT_NAME" \
+            --gitleaks "$RUNNER_TEMP/bin/gitleaks" --source repo
+
+      - name: Trailers and agent lines (Co-Authored-By, Claude-Session, Generated with … fail the check)
+        if: ${{ !cancelled() }}
+        run: >-
+          python3 wf/scripts/tm.py check-trailers --event "$GITHUB_EVENT_PATH"
+          --event-name "$GITHUB_EVENT_NAME" --git-dir repo
+
+      - name: Format checks (warnings, never blocking)
+        if: ${{ !cancelled() }}
+        run: >-
+          python3 wf/scripts/tm.py check-format --event "$GITHUB_EVENT_PATH"
+          --event-name "$GITHUB_EVENT_NAME" --git-dir repo
