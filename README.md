@@ -45,6 +45,23 @@ GitHub Packages) passes a read token to the setup command, which only sees it as
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}   # a classic PAT with read:packages, as a repo secret
 ```
 
+A repo that installs the Kanon packages (`@techmirion/*` on GitHub Packages, public, but the
+registry wants a token even to read them) calls `checks-packages.yml` instead of `checks.yml`,
+adds `packages: read` to the permissions of its caller (a called job cannot have more than its
+caller), and has an `.npmrc` that points `@techmirion` at `https://npm.pkg.github.com` and reads
+`${NPM_TOKEN}`. The setup command gets the repo's own workflow token as `NPM_TOKEN` (not the tests
+or the linters): no secret to create. `checks.yml` is the same without the permission, for every
+other repo.
+
+```yaml
+permissions:
+  contents: read
+  packages: read
+jobs:
+  checks:
+    uses: Techmirion/workflows/.github/workflows/checks-packages.yml@v1
+```
+
 | Caller | Trigger | Does |
 |---|---|---|
 | `checks.yml` | PR into dev or main (opened, synchronize, reopened, edited); push to dev or main | tests, lint, gitleaks, `Co-Authored-By:` trailers and lines naming the agent in the new commits and the PR title and body (these fail); format checks of branch, commits, PR title and body as **warnings** |
